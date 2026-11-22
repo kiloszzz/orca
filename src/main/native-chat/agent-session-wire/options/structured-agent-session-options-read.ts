@@ -122,8 +122,11 @@ export async function readStructuredAgentSessionOptions(
       options = listedModelIds ? { ...answer, listedModelIds } : answer
     }
   } else {
-    const { inventory, fallback: _fallback, ...answer } = await atRest()
-    options = { ...answer, ...(inventory.origin === 'unknown' ? { modelsKnown: false } : {}) }
+    const { inventory, fallback, ...answer } = await atRest()
+    options = {
+      ...answer,
+      ...(inventory.origin === 'unknown' && fallback.length === 0 ? { modelsKnown: false } : {})
+    }
   }
   // Earlier reads may have closed/reopened the handle.
   const session = await context.conversation(sessionId)

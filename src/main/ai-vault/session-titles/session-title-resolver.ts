@@ -15,11 +15,14 @@ function normalizeRequest(request: AiVaultSessionTitleRequest): AiVaultSessionTi
     return null
   }
   const transcriptPath = request.transcriptPath?.trim()
+  const ext = transcriptPath ? extname(transcriptPath).toLowerCase() : ''
+  const validExt =
+    request.agent === 'dsh-acp' ? ext === '.zstd' || ext === '.jsonl' : ext === '.jsonl'
   if (
     !transcriptPath ||
     transcriptPath.length > TRANSCRIPT_PATH_MAX_LENGTH ||
     hasUnsafeProviderSessionIdChars(transcriptPath) ||
-    extname(transcriptPath).toLowerCase() !== '.jsonl'
+    !validExt
   ) {
     return { agent: request.agent, sessionId }
   }

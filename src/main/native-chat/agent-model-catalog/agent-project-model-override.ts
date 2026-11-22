@@ -185,9 +185,9 @@ function ancestry(cwd: string): string[] {
   }
 }
 
-// Grok uses user, managed and environment config, not project model settings.
+// Grok and DSH ACP use user, managed and environment config, not project model settings.
 export function agentReadsProjectModelConfig(agent: string): boolean {
-  return agent !== 'grok'
+  return agent !== 'grok' && agent !== 'dsh-acp'
 }
 
 export async function workspaceMayOverrideDefaultModel(input: {

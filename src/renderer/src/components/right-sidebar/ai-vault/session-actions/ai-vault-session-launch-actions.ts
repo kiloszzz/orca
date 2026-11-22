@@ -146,6 +146,26 @@ export function useAiVaultSessionLaunchActions({
         void activateAiVaultStructuredSession(session)
         return
       }
+      // `dsh-acp` has no TUI terminal surface; resume directly in Orca Chat.
+      if (session.agent === 'dsh-acp') {
+        const worktreeId = targetWorktreeId ?? activeWorktreeId ?? activeWorktree?.id ?? null
+        if (!worktreeId) {
+          toast.error(
+            translate(
+              'auto.components.right.sidebar.AiVaultPanel.openWorkspaceBeforeResuming',
+              'Open a workspace before resuming a session.'
+            )
+          )
+          return
+        }
+        void resumeAiVaultSessionInNewChat(
+          session,
+          'dsh-acp',
+          worktreeId,
+          createNonSecureContextUuid()
+        )
+        return
+      }
       launchInTerminal(
         session,
         targetWorktreeId,
@@ -156,7 +176,7 @@ export function useAiVaultSessionLaunchActions({
         (message) => describeAiVaultResumeFailure(new Error(message), session.agent)
       )
     },
-    [buildResumeStartup, launchInTerminal]
+    [activeWorktree?.id, activeWorktreeId, buildResumeStartup, launchInTerminal]
   )
 
   // Native chat keeps the conversation it owns; the terminal gets a copy (see the fork builder).

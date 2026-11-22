@@ -118,7 +118,7 @@ export function MobileAgentIcon({ agentId, size = 16 }: { agentId: string; size?
   }
 
   // Use bundled favicon instead of Google service for offline/regional availability (#8451).
-  const iconAgentId = agentId === 'dsb' ? 'dsh' : agentId
+  const iconAgentId = agentId === 'dsb' || agentId === 'dsh-acp' ? 'dsh' : agentId
   const bundledIcon = iconAssets[iconAgentId]
   if (bundledIcon) {
     return <BundledIcon source={bundledIcon} size={size} />

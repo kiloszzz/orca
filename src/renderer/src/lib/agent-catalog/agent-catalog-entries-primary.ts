@@ -95,6 +95,13 @@ export function primaryAgentCatalogEntries(): AgentCatalogEntry[] {
       homepageUrl: 'https://github.com/ccch1mneyyy/dsh-TUI#quick-start'
     },
     {
+      id: 'dsh-acp',
+      label: 'DeepSeek Harness ACP',
+      cmd: 'dsh',
+      searchAliases: ['deepseek', 'dsh', 'dsh-acp', 'deepseek harness'],
+      homepageUrl: 'https://www.deepseek.com'
+    },
+    {
       id: 'qoder',
       label: translate('auto.lib.agent.catalog.qoder_label', 'Qoder CLI'),
       cmd: 'qodercli',

@@ -77,7 +77,10 @@ export function adoptedTranscriptSourceObserver(input: {
         sawCodexMetadata = true
         const payload = asRecord(record.payload)
         sessionId = extractString(payload?.id) ?? sessionId
-      } else if ((input.agent === 'omp' || input.agent === 'pi') && record.type === 'session') {
+      } else if (
+        (input.agent === 'omp' || input.agent === 'pi' || input.agent === 'dsh-acp') &&
+        record.type === 'session'
+      ) {
         sessionId = extractString(record.id)
         cwd = extractString(record.cwd)
       }

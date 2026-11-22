@@ -182,7 +182,12 @@ export function structuredChatNamingDeps(
       const useChatAgent = !recipe.agentId && !recipe.agentArgs?.trim()
       const log = { scope: 'conversation-name', sessionId: record.sessionId }
       // These save every CLI run, so a naming run would sit in the user's own history.
-      if (useChatAgent && (record.provider === 'copilot' || record.provider === 'kimi')) {
+      if (
+        useChatAgent &&
+        (record.provider === 'copilot' ||
+          record.provider === 'kimi' ||
+          record.provider === 'dsh-acp')
+      ) {
         return null
       }
       if (useChatAgent && (record.provider === 'grok' || record.provider === 'antigravity')) {

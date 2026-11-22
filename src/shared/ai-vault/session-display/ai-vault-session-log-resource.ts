@@ -60,7 +60,9 @@ const logFileResolvers = {
   kimi: () => null,
   muse: jsonlLog,
   jcode: jsonLog,
-  kiro: (filePath) => kiroTranscriptPathForMetadata(filePath) || null
+  kiro: (filePath) => kiroTranscriptPathForMetadata(filePath) || null,
+  // Compressed .zstd transcripts cannot open directly as plain-text log files.
+  'dsh-acp': () => null
 } satisfies Record<AiVaultAgent, LogFileResolver>
 
 export function aiVaultSessionLogFilePath(

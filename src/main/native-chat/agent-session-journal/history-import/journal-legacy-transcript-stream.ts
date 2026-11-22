@@ -1,9 +1,14 @@
 import { decodeClaudeTranscriptLine } from '../../transcript-decoding/transcript-line-decoders-claude'
 import { decodeCodexTranscriptLine } from '../../transcript-decoding/transcript-line-decoders-codex'
+import { decodeDshAcpTranscriptLine } from '../../transcript-decoding/transcript-line-decoders-dsh-acp'
 import { decodeGrokTranscriptLine } from '../../transcript-decoding/transcript-line-decoders-grok'
 import { decodeOmpTranscriptLine } from '../../transcript-decoding/transcript-line-decoders-omp'
 import { createReadStream } from 'node:fs'
 import { decodeTranscriptStream } from '../../transcript-streaming/transcript-stream-lines'
+import {
+  isZstdTranscriptPath,
+  zstdTranscriptStream
+} from '../../transcript-streaming/transcript-zstd-decompression'
 import {
   readCodexLocalHistory,
   type CodexHistoryRecord
@@ -24,7 +29,9 @@ export async function readLegacyImportTranscript(
         })
       }
     : decodeTranscriptStream(
-        createReadStream(input.filePath),
+        isZstdTranscriptPath(input.filePath)
+          ? zstdTranscriptStream(createReadStream(input.filePath))
+          : createReadStream(input.filePath),
         input.filePath,
         0,
         visit,
@@ -38,5 +45,6 @@ export const TRANSCRIPT_DECODERS = {
   codex: (line: string, fallbackId: string) =>
     decodeCodexTranscriptLine(line, fallbackId, { historyImport: true }),
   grok: decodeGrokTranscriptLine,
-  omp: decodeOmpTranscriptLine
+  omp: decodeOmpTranscriptLine,
+  'dsh-acp': decodeDshAcpTranscriptLine
 } as const

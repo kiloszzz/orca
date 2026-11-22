@@ -315,6 +315,8 @@ const TUI_AGENT_CONFIG_SOURCE: Record<TuiAgent, TuiAgentConfigSource> = {
     submitRetryDelayMs: 1000,
     submitRetryBudgetMs: 30_000
   },
+  // prettier-ignore
+  'dsh-acp': { detectCmd: 'dsh', launchCmd: 'dsh --profile acp', promptInjectionMode: 'stdin-after-start' },
   zcode: {
     detectCmd: 'zcode',
     // ZCode sets process.title to zcode-cli; matching only its zcode launch name would reject dispatch as no_agent_detected.

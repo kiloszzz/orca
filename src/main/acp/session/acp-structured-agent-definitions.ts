@@ -41,8 +41,8 @@ export function acpStructuredAgentDefinition(spec: AcpLaunchSpec): StructuredAge
     ...(hostBackend && { runsHostProgram: (home) => hostBackend.pins(home) }),
     restingOptions: {
       acceptsKey: isAcpStructuredOptionKey,
-      // Populate catalogs from live agents.
-      fallbackModels: () => null,
+      // Populate catalogs from live agents, falling back to spec-provided seeds while resting.
+      fallbackModels: spec.fallbackModels ?? (() => null),
       effortDefaultsToModel: false
     }
   }

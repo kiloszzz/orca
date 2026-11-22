@@ -2,7 +2,8 @@ import { pipeline, type Readable } from 'node:stream'
 import { createZstdDecompress } from 'node:zlib'
 
 export function isZstdTranscriptPath(path: string): boolean {
-  return path.endsWith('.zst')
+  const lower = path.toLowerCase()
+  return lower.endsWith('.zst') || lower.endsWith('.zstd')
 }
 
 /** Pipes raw compressed bytes through the zstd decoder; errors on the raw stream surface on the output. */

@@ -50,6 +50,7 @@ const TUI_AGENT_KIND_BY_AGENT = {
   muse: 'muse',
   zcode: 'zcode',
   dsh: 'dsh',
+  'dsh-acp': 'dsh-acp',
   jcode: 'jcode'
 } satisfies Record<TuiAgent, ConcreteAgentKind>
 

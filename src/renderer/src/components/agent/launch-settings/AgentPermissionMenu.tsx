@@ -93,7 +93,7 @@ export function AgentPermissionMenu({
           />
         </DropdownMenuContent>
       </DropdownMenu>
-      {permission.terminalChoice === 'own' && permission.chatChoice ? (
+      {agentId !== 'dsh-acp' && permission.terminalChoice === 'own' && permission.chatChoice ? (
         <span className="text-xs text-muted-foreground">
           {t(
             'settings.agents.permissionSurfaceDifference',

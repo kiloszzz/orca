@@ -12,9 +12,14 @@ import { openTranscriptReadStream } from './transcript-filesystem/wsl-transcript
 import { wslTranscriptFsRefusal } from './transcript-filesystem/wsl-transcript-fs-error'
 import { decodeClaudeTranscriptLine } from './transcript-decoding/transcript-line-decoders-claude'
 import { decodeCodexTranscriptLine } from './transcript-decoding/transcript-line-decoders-codex'
+import { decodeDshAcpTranscriptLine } from './transcript-decoding/transcript-line-decoders-dsh-acp'
 import { decodeGrokTranscriptLine } from './transcript-decoding/transcript-line-decoders-grok'
 import { decodeOmpTranscriptLine } from './transcript-decoding/transcript-line-decoders-omp'
 import { decodeTranscriptStream } from './transcript-streaming/transcript-stream-lines'
+import {
+  isZstdTranscriptPath,
+  zstdTranscriptStream
+} from './transcript-streaming/transcript-zstd-decompression'
 
 export type ReadTranscriptResult =
   | {
@@ -77,6 +82,11 @@ export async function readNativeChatTranscript(
         messages: await readTranscript(filePath, decodeOmpTranscriptLine, options.sourceOrder)
       }
     }
+    if (transcriptAgent === 'dsh-acp') {
+      return {
+        messages: await readTranscript(filePath, decodeDshAcpTranscriptLine, options.sourceOrder)
+      }
+    }
     return { error: `Unsupported agent for Chat UI transcript: ${agent}` }
   } catch (err) {
     // First flush/rotation can race successful resolution; ENOENT remains retryable.
@@ -92,7 +102,9 @@ async function readTranscript(
   decode: (line: string, fallbackId: string) => NativeChatMessage | null,
   sourceOrder = false
 ): Promise<NativeChatMessage[]> {
-  const stream = openTranscriptReadStream(filePath, { encoding: 'utf-8' }, 'exact')
+  const compressed = isZstdTranscriptPath(filePath)
+  const raw = openTranscriptReadStream(filePath, compressed ? {} : { encoding: 'utf-8' }, 'exact')
+  const stream = compressed ? zstdTranscriptStream(raw) : raw
   const { messages } = await decodeTranscriptStream(
     stream,
     filePath,

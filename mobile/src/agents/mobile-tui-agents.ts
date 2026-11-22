@@ -19,6 +19,7 @@ export const MOBILE_TUI_AGENT_FAVICON_DOMAINS: Partial<Record<TuiAgent, string>>
   copilot: 'github.com',
   opencode: 'opencode.ai',
   dsh: 'deepseek.com',
+  'dsh-acp': 'deepseek.com',
   omp: 'omp.sh',
   kilo: 'kilo.ai',
   droid: 'factory.ai'

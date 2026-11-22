@@ -9,6 +9,7 @@ import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat/nativ
 import { resolveSessionFilePath, type ResolveSessionFileOptions } from './session-file-resolver'
 import { decodeClaudeTranscriptLine } from './transcript-decoding/transcript-line-decoders-claude'
 import { decodeCodexTranscriptLine } from './transcript-decoding/transcript-line-decoders-codex'
+import { decodeDshAcpTranscriptLine } from './transcript-decoding/transcript-line-decoders-dsh-acp'
 import { decodeGrokTranscriptLine } from './transcript-decoding/transcript-line-decoders-grok'
 import { decodeOmpTranscriptLine } from './transcript-decoding/transcript-line-decoders-omp'
 import { transcriptFallbackId } from './transcript-streaming/transcript-fallback-id'
@@ -48,6 +49,9 @@ export function nativeChatLineDecoderForAgent(agent: AgentType): NativeChatLineD
   }
   if (transcriptAgent === 'omp') {
     return decodeOmpTranscriptLine
+  }
+  if (transcriptAgent === 'dsh-acp') {
+    return decodeDshAcpTranscriptLine
   }
   return null
 }

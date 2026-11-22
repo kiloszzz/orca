@@ -19,6 +19,7 @@ import {
   findGrokChatHistoryBySessionId,
   resolveGrokSessionsDir
 } from '../../shared/grok-session-paths'
+import { findDshAcpSessionFile, resolveDshAcpHomeDir } from '../dsh-acp/dsh-acp-transcript-import'
 import {
   hostAdditionalCodexHomePaths,
   needsWslHostResolution,
@@ -63,6 +64,7 @@ function grokSessionsDir(): string {
 export type ResolveSessionFileOptions = {
   strictErrors?: boolean
   claudeProjectsDir?: string
+  dshAcpSessionsDir?: string
   /** Claude only: probe this cwd's project bucket first in each root. */
   cwd?: string
   /** Defaults to managed Codex then CODEX_HOME/~/.codex, in order. */
@@ -190,6 +192,10 @@ async function resolveSessionFileById(
       signal,
       strictErrors: options.strictErrors
     })
+  }
+  if (transcriptAgent === 'dsh-acp') {
+    const root = options.dshAcpSessionsDir ?? join(resolveDshAcpHomeDir(), 'sessions')
+    return findDshAcpSessionFile(root, trimmedId, signal)
   }
   transcriptAgent satisfies never
   return null

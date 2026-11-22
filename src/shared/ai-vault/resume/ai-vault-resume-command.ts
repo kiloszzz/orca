@@ -170,6 +170,9 @@ function defaultAiVaultResumeCommandBase(agent: AiVaultAgent): string {
   if (agent === 'hermes') {
     return 'hermes'
   }
+  if (agent === 'dsh-acp') {
+    return 'dsh'
+  }
   // Preserve launch subcommands and mode flags when resuming.
   if (agent === 'rovo' || agent === 'opencode2' || agent === 'kiro') {
     return TUI_AGENT_CONFIG[agent].launchCmd
@@ -223,6 +226,8 @@ function buildAgentResumeInvocation(
       return `${baseCommand} --conversation ${sessionArg}`
     case 'kiro':
       return `${baseCommand} --resume-id ${sessionArg}`
+    case 'dsh-acp':
+      return `${baseCommand} tui --resume ${sessionArg}`
   }
 }
 

@@ -45,7 +45,9 @@ export const AGENT_SESSION_SETUP_COMMANDS = [
     installCommand: 'curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash'
   },
   // An `agy` login does not sign its chats in: they keep their own sign-in.
-  { agent: 'antigravity', loginCommand: [] }
+  { agent: 'antigravity', loginCommand: [] },
+  // DSH signs in through its own credentials store rather than an interactive CLI login command.
+  { agent: 'dsh-acp', loginCommand: [] }
 ] as const
 
 export function agentSessionSetupFor(agent: string | undefined) {

@@ -19,6 +19,7 @@ import { resolveMuseSessionsDir } from '../../../shared/muse-session-log'
 import { isKiroSessionMetadataPath } from '../scanners/kiro/session-scanner-kiro-parser'
 
 import { OPENCLAW_AGENT_SOURCE } from '../scanners/openclaw/openclaw-session-layout'
+import { DSH_ACP_AGENT_SOURCE } from '../scanners/dsh-acp/dsh-acp-session-layout'
 import { isOmpConversationDirectory } from '../scanners/omp/session-scanner-omp-subagent-transcripts'
 import {
   claudeProjectsRootDirs,
@@ -306,7 +307,8 @@ export const AI_VAULT_AGENT_SOURCES: AiVaultAgentSourceTable = {
     extensions: ['.jsonl'],
     // Exclude log, SQLite and materialized-projection sidecars.
     filePredicate: (filePath) => basename(filePath) === 'session.jsonl'
-  }
+  },
+  'dsh-acp': DSH_ACP_AGENT_SOURCE
 }
 
 // The Pi walk labels the OMP transcripts it reads, so an OMP row can sit under Pi's roots too.

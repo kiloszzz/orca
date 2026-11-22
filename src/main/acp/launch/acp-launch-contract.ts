@@ -15,6 +15,7 @@ import type {
 import type { AcpSignInWatch } from '../process/acp-agent-connection'
 import type { AcpLaunchGate } from './acp-launch-gate'
 import type { AgentSessionAccountHome } from '../../../shared/agent-session/lifecycle/agent-session-account-home'
+import type { AgentSessionModelOption } from '../../../shared/agent-session/agent-session-wire'
 import type { AcpModelDiscovery } from '../discovery/acp-model-discovery-policy'
 import type { InitializeResponse } from '../generated/acp-protocol.generated'
 
@@ -65,6 +66,8 @@ export type AcpLaunchSpec = {
    *  turns made outside it; absent, the replay is only dropped. */
   historyCatchUp?: AcpHistoryTurnIdentity
   modelDiscovery: AcpModelDiscovery
+  /** Seed models offered while a session is resting before the ACP server starts. */
+  fallbackModels?: () => AgentSessionModelOption[] | null
   visualsSkill?: AcpVisualsSkillLoader
   transcriptImport: StructuredAgentTranscriptImport | null
   sessionHistory: StructuredAgentSessionHistory

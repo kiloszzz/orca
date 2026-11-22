@@ -133,7 +133,7 @@ const MovePaneToNewTabCommand = z.object({
 })
 
 const AiVaultTitle = z.object({
-  agent: z.enum(['claude', 'codex']),
+  agent: z.enum(['claude', 'codex', 'dsh-acp']),
   sessionId: z.string(),
   title: z.string(),
   kind: z.enum(['named', 'fallback']).optional().catch(undefined)

@@ -16,9 +16,11 @@ import {
 export function sourceControlActionAgentPicksModel(
   agent: string | null | undefined
 ): agent is TuiAgent {
-  return (
-    isTuiAgent(agent) && Boolean(getAgentSessionOptionLaunchCatalog(agent)?.modelApply.launchArgs)
-  )
+  if (!isTuiAgent(agent)) {
+    return false
+  }
+  const catalog = getAgentSessionOptionLaunchCatalog(agent)
+  return Boolean(catalog?.modelApply.launchArgs || (agent === 'dsh-acp' && catalog?.models.length))
 }
 
 /** The one route a saved choice reaches, for the hint under its control; null reaches both. */

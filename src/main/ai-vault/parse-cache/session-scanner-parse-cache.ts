@@ -84,6 +84,7 @@ function resumableStateFactoryFor(
     case 'cline':
     case 'kimi':
     case 'kiro':
+    case 'dsh-acp':
     case 'muse':
     case 'opencode':
     case 'opencode2':
@@ -147,6 +148,7 @@ function sessionParseCacheCoversTranscript(
   const entry = getSessionParseCacheEntry(key)
   return (
     entry !== undefined &&
+    (!entry.session || entry.session.agent === candidate.agent) &&
     entry.platform === platform &&
     entry.mtimeMs === file.mtimeMs &&
     (entry.sizeBytes === null || file.sizeBytes === undefined || entry.sizeBytes === file.sizeBytes)

@@ -55,7 +55,7 @@ export function AgentIcon({
   }
   const catalogEntry = getAgentCatalog().find((a) => a.id === agent)
   // Prefer bundled favicons for offline use and regions where Google’s service is unreachable (#8451).
-  const iconAgent = agent === 'dsb' ? 'dsh' : agent
+  const iconAgent = agent === 'dsb' || agent === 'dsh-acp' ? 'dsh' : agent
   const bundledFaviconUrl = AGENT_FAVICON_ASSETS[iconAgent]
   // Resolve src once so empty iconUrl cannot pass a truthy fallback guard yet render src="".
   const iconSrc = catalogEntry?.iconUrl ?? bundledFaviconUrl

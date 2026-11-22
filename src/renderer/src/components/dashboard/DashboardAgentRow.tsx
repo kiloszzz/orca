@@ -12,6 +12,7 @@ import {
   type AgentDotState
 } from '@/components/AgentStateDot'
 import { AgentTypeIcon } from '@/components/agent/icons/agent-type-icon'
+import { formatCompactModelBadge } from '../../../../shared/model-id-label'
 import { formatAgentTypeLabel } from '../../../../shared/agent-status/presentation/agent-type-label'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { DashboardAgentRowMessage } from './DashboardAgentRowMessage'
@@ -180,7 +181,7 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
     agentStateLabel(
       agent.childRow?.displayState ?? asDotState(agent.state, agent.entry.workingMode)
     )
-  const model = agent.entry.model?.trim() ?? ''
+  const model = agent.entry.model?.trim() ? formatCompactModelBadge(agent.entry.model) : ''
   const isMonitoring = agent.state === 'working' && agent.entry.workingMode === 'monitoring'
   const isWorking = agent.state === 'working' && !isMonitoring
   // Show tool details only for working/approval waits; ended or monitoring turns have stale last-tool metadata.

@@ -31,7 +31,8 @@ export function aiVaultSessionResumeInChatWorkspaceMatters(
     agent === 'omp' ||
     agent === 'opencode' ||
     agent === 'opencode2' ||
-    agent === 'pi'
+    agent === 'pi' ||
+    agent === 'dsh-acp'
   )
 }
 

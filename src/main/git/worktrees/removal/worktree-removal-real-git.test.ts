@@ -6,13 +6,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { promisify } from 'node:util'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { installRealWorkerThreadChildProcesses } from '../../../worker-thread-child-process/worker-thread-child-process-real.test-fixtures'
-import { removeTree } from '../../../../shared/windows-transient-lock-removal'
+import { removeTree } from '../../../../shared/file-write/windows-transient-lock-removal'
 
 import { listWorktreesStrict } from '../catalog/worktree-listing'
 import { removeWorktree } from './worktree-removal'
+import {
+  _queuedWorktreeDeletesForTests,
+  runUnderWorktreeDeleteLimit,
+  WORKTREE_DELETE_CONCURRENCY
+} from './worktree-delete-limit'
+import { assertWorktreeCleanForRemoval } from './worktree-removal-preflight'
 import { areWorktreePathsEqual } from '../catalog/worktree-path-comparison'
 import { isPrunableGitFileWorktree } from '../../../workspaces/removal/worktree-prunable-git-file'
 import { removeStaleLocalWorktreeRegistration } from '../../../workspaces/removal/local-worktree-removal-recovery'
@@ -70,6 +76,48 @@ afterEach(async () => {
 })
 
 describe('worktree removal against the real Git binary', () => {
+  it('keeps the checkout when the pre-delete check refuses', async () => {
+    await expect(
+      removeWorktree(repoPath, worktreePath, true, {
+        beforeCheckoutDelete: async () => {
+          throw new Error('different checkout')
+        }
+      })
+    ).rejects.toThrow('different checkout')
+
+    expect(existsSync(worktreePath)).toBe(true)
+    expect(await isRegistered(worktreePath)).toBe(true)
+  })
+
+  it('checks identity only after a queued delete acquires its slot', async () => {
+    let releaseSlots!: () => void
+    const held = new Promise<void>((resolve) => {
+      releaseSlots = resolve
+    })
+    const holders = Array.from({ length: WORKTREE_DELETE_CONCURRENCY }, () =>
+      runUnderWorktreeDeleteLimit(() => held)
+    )
+    let replaced = false
+    const removal = removeWorktree(repoPath, worktreePath, true, {
+      beforeCheckoutDelete: async () => {
+        if (replaced) {
+          throw new Error('different checkout')
+        }
+      }
+    })
+    try {
+      await vi.waitFor(() => expect(_queuedWorktreeDeletesForTests()).toBe(1))
+    } finally {
+      // Swapped while the request queued for a slot; always free the slots so a failed wait cannot starve later tests.
+      replaced = true
+      releaseSlots()
+    }
+    await Promise.all(holders)
+
+    await expect(removal).rejects.toThrow('different checkout')
+    expect(existsSync(worktreePath)).toBe(true)
+  })
+
   it('preserves a branch whose only unmerged commit is empty', async () => {
     await git(['commit', '--allow-empty', '-qm', 'unique empty commit'], worktreePath)
     const head = (await git(['rev-parse', 'HEAD'], worktreePath)).trim()
@@ -146,11 +194,37 @@ describe('worktree removal against the real Git binary', () => {
     expect(await isRegistered(subWorktreePath)).toBe(false)
   })
 
+  // Builds a ~48k-entry real Git index (>10 MiB of ls-files output), which is slow on Windows runners.
+  it('finds a checked-out submodule in an index listing larger than the Git output buffer', async () => {
+    const blob = (await git(['hash-object', '-w', 'seed.txt'], worktreePath)).trim()
+    const head = (await git(['rev-parse', 'HEAD'], worktreePath)).trim()
+    const entries = Array.from(
+      { length: 48_000 },
+      (_, i) => `100644 ${blob}\t${'nested-directory/'.repeat(12)}file-${i}.txt\n`
+    )
+    // Sorts last, so the gitlink is only seen after more than 10 MiB of listing.
+    entries.push(`160000 ${head}\tzz-vendor\n`)
+    const indexInfo = execFileAsync('git', ['update-index', '--index-info'], { cwd: worktreePath })
+    indexInfo.child.stdin?.end(entries.join(''))
+    await indexInfo
+    await mkdir(join(worktreePath, 'zz-vendor', '.git'), { recursive: true })
+
+    await expect(
+      assertWorktreeCleanForRemoval(
+        worktreePath,
+        false,
+        {},
+        join(repoPath, '.git', 'worktrees', 'feature')
+      )
+    ).rejects.toThrow('Worktree has uncommitted or untracked changes, and it contains submodules.')
+  }, 60_000)
+
   it('prunes a proven malformed registration while retaining checkout files and its branch', async () => {
     const markerPath = join(worktreePath, '.git')
     const marker = await readFile(markerPath, 'utf8')
     const adminPath = marker.trim().replace(/^gitdir: /, '')
-    await writeFile(join(adminPath, 'gitdir'), `${join(markerPath, '.git')}\n`)
+    // Git strips literal "/.git" from admin gitdir entries, even on Windows.
+    await writeFile(join(adminPath, 'gitdir'), `${markerPath.replaceAll('\\', '/')}/.git\n`)
     await writeFile(join(worktreePath, 'untracked.txt'), 'keep this work\n')
     const row = (await listWorktreesStrict(repoPath)).find((entry) =>
       areWorktreePathsEqual(entry.path, markerPath)

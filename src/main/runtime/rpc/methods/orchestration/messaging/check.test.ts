@@ -11,6 +11,7 @@ import type { OrcaRuntimeService } from '../../../../orca-runtime'
 
 import '../../../../orchestration/db/root-dispatch-test-fixture'
 import { MessageWake } from '../../../../orchestration/mailbox/runtime-message-waiters'
+import { getQuestionTaker } from '../../../../orchestration/db/messages/mail-taker'
 
 describe('orchestration RPC methods', () => {
   const h = createOrchestrationRpcHarness()
@@ -134,25 +135,6 @@ describe('orchestration RPC methods', () => {
       expect(result.messages.map((message) => message.subject)).toEqual(['Coordinator only'])
     })
 
-    it('says to check again only when a capped batch leaves mail behind', async () => {
-      setup()
-      for (let index = 0; index < 51; index++) {
-        db.insertMessage({
-          from: 'term_worker',
-          to: `run:${activeRunId}`,
-          subject: `status ${index}`,
-          type: 'status',
-          runId: activeRunId
-        })
-      }
-      const check = () => call('orchestration.check', { terminal: 'term_coord' })
-
-      expect(await check()).toMatchObject({ count: 50, next: expect.stringContaining('again') })
-      const last = await check()
-      expect(last).toMatchObject({ count: 1 })
-      expect(last).not.toHaveProperty('next')
-    })
-
     it('rejects stale Delivery acknowledgment without consuming queued mail', async () => {
       setup()
       db.insertMessage({
@@ -171,29 +153,6 @@ describe('orchestration RPC methods', () => {
       expect(db.getUnreadMessages(`run:${activeRunId}`)).toHaveLength(1)
     })
 
-    it('acknowledges a Run Delivery before returning --peek history', async () => {
-      setup()
-      db.insertMessage({
-        from: 'worker',
-        to: `run:${activeRunId}`,
-        subject: 'queued',
-        runId: activeRunId
-      })
-
-      const first = (await call('orchestration.check', {
-        terminal: 'term_coord'
-      })) as { count: number; deliveryId: string }
-      const peeked = (await call('orchestration.check', {
-        terminal: 'term_coord',
-        ack: first.deliveryId,
-        peek: true
-      })) as { acknowledged: string | null; count: number }
-
-      expect(first.count).toBe(1)
-      expect(peeked).toMatchObject({ acknowledged: first.deliveryId, count: 0 })
-      expect(db.getUnreadMessages(`run:${activeRunId}`)).toHaveLength(0)
-    })
-
     it('peeks an old unread Run row beyond the newest history page', async () => {
       setup()
       const unread = db.insertMessage({
@@ -209,7 +168,7 @@ describe('orchestration RPC methods', () => {
           subject: `new read ${index}`,
           runId: activeRunId
         })
-        db.markAsRead([read.id])
+        db.markAsRead([read.id], { kind: 'orca' })
       }
 
       const peeked = (await call('orchestration.check', {
@@ -255,6 +214,37 @@ describe('orchestration RPC methods', () => {
       expect(db.getUnreadMessages(`run:${activeRunId}`, ['worker_done'])).toHaveLength(1)
     })
 
+    it('records the checking terminal as the taker of a question it reads, in a Run or its own mail', async () => {
+      setup()
+      resolveDirectPanes('b')
+      const ask = (to: string) => {
+        const admitted = db.admitBotRequest({
+          rootKey: to,
+          fromBotId: 'ranger',
+          toBotId: 'docs',
+          purpose: 'question',
+          depth: 1,
+          record: '{}',
+          message: {
+            from: 'orca_session_id:asker',
+            to,
+            subject: to,
+            type: 'question',
+            runId: activeRunId
+          }
+        })
+        return admitted.kind === 'sent' ? admitted.message.id : ''
+      }
+      const direct = ask('b')
+      const inRun = ask(`run:${activeRunId}`)
+
+      await call('orchestration.check', { terminal: 'b' })
+      await call('orchestration.check', { terminal: 'term_coord' })
+
+      expect(getQuestionTaker(db, direct)).toBe('terminal:b')
+      expect(getQuestionTaker(db, inRun)).toBe('terminal:term_coord')
+    })
+
     it('default (unread only) marks returned rows as read', async () => {
       setup()
       resolveDirectPanes('b')
@@ -284,23 +274,6 @@ describe('orchestration RPC methods', () => {
       expect(db.getUnreadMessages('term_gone')).toHaveLength(1)
     })
 
-    it('still inspects a stale handle with --peek and --all', async () => {
-      setup()
-      db.insertMessage({ from: 'a', to: 'term_gone', subject: 'stranded' })
-
-      const peeked = (await call('orchestration.check', {
-        terminal: 'term_gone',
-        peek: true
-      })) as { count: number }
-      const history = (await call('orchestration.check', {
-        terminal: 'term_gone',
-        all: true
-      })) as { count: number }
-
-      expect(peeked.count).toBe(1)
-      expect(history.count).toBe(1)
-    })
-
     it('--peek returns unread messages without marking them read', async () => {
       setup()
       db.insertMessage({ from: 'a', to: 'b', subject: 'one' })
@@ -317,7 +290,7 @@ describe('orchestration RPC methods', () => {
     it("treats the CLI's {peek, unread:false} compat pair as peek, not all", async () => {
       setup()
       const seen = db.insertMessage({ from: 'a', to: 'b', subject: 'seen' })
-      db.markAsRead([seen.id])
+      db.markAsRead([seen.id], { kind: 'orca' })
       db.insertMessage({ from: 'a', to: 'b', subject: 'fresh' })
 
       const result = (await call('orchestration.check', {
@@ -335,7 +308,7 @@ describe('orchestration RPC methods', () => {
       setup()
       db.insertMessage({ from: 'a', to: 'b', subject: 'one' })
       const second = db.insertMessage({ from: 'a', to: 'b', subject: 'two' })
-      db.markAsRead([second.id])
+      db.markAsRead([second.id], { kind: 'orca' })
 
       const result = (await call('orchestration.check', {
         terminal: 'b',

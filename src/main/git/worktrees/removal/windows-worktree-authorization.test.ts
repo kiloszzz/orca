@@ -1,18 +1,35 @@
+import { lstatSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import {
   throwIfSignalAborted,
   waitForPromiseWithSignal
-} from '../../../../shared/abort-signal-reason'
+} from '../../../../shared/concurrency/abort-signal-reason'
 import type { GitWorktreeInfo } from '../../../../shared/worktree/types'
 
-const { graph, stat, names, removeChild, unlink, rmdir, clean } = vi.hoisted(() => ({
+const {
+  graph,
+  stat,
+  statBigInt,
+  names,
+  removeChild,
+  unlink,
+  rmdir,
+  clean,
+  readMarker,
+  proveOrphan
+} = vi.hoisted(() => ({
   graph: vi.fn(),
   stat: vi.fn(),
+  statBigInt: vi.fn(),
   names: vi.fn(),
   removeChild: vi.fn(),
   unlink: vi.fn(),
   rmdir: vi.fn(),
-  clean: vi.fn()
+  clean: vi.fn(),
+  readMarker: vi.fn(),
+  proveOrphan: vi.fn()
 }))
 vi.mock('../catalog/worktree-list-reader', async (original) => ({
   ...(await original<Record<string, unknown>>()),
@@ -20,6 +37,7 @@ vi.mock('../catalog/worktree-list-reader', async (original) => ({
 }))
 vi.mock('../../../filesystem/asar-transparent-fs', () => ({
   lstat: stat,
+  lstatBigInt: statBigInt,
   readdir: names,
   rm: removeChild,
   unlink,
@@ -27,15 +45,16 @@ vi.mock('../../../filesystem/asar-transparent-fs', () => ({
 }))
 vi.mock('node:fs/promises', async (original) => ({
   ...(await original<Record<string, unknown>>()),
-  readFile: async () => 'gitdir: C:/repo/.git/worktrees/feature'
+  readFile: readMarker
 }))
 vi.mock('../../../workspaces/removal/worktree-removal-safety', async (original) => ({
   ...(await original<Record<string, unknown>>()),
-  canSafelyRemoveOrphanedWorktreeDirectory: async () => true
+  canSafelyRemoveOrphanedWorktreeDirectory: proveOrphan
 }))
 vi.mock('./worktree-removal-preflight', () => ({ assertWorktreeCleanForRemoval: clean }))
 
-import { authorizeWindowsCheckout, removeWindowsCheckout } from './windows-worktree-removal'
+import { removeWindowsCheckout } from './windows-worktree-removal'
+import { removeUnregisteredHostCheckout } from '../../../filesystem/host-tree-removal'
 import { _resetWorktreeScanCacheForTests } from '../catalog/worktree-scan-cache'
 
 const originalPlatform = process.platform
@@ -57,78 +76,31 @@ beforeEach(() => {
     if (String(path).endsWith('locked')) {
       throw missing
     }
-    return { isDirectory: () => true, isSymbolicLink: () => false }
+    return { isDirectory: () => true, isSymbolicLink: () => false, dev: 1, ino: 1 }
+  })
+  statBigInt.mockImplementation(async (path: string) => {
+    if (String(path).endsWith('locked')) {
+      throw missing
+    }
+    return { isDirectory: () => true, isSymbolicLink: () => false, dev: 1n, ino: 1n }
   })
   names.mockResolvedValue(['held', '.git'])
   removeChild.mockResolvedValue(undefined)
   unlink.mockResolvedValue(undefined)
   rmdir.mockResolvedValue(undefined)
   clean.mockResolvedValue(undefined)
+  readMarker.mockImplementation(async (path: string) =>
+    String(path).startsWith(tmpdir())
+      ? readFileSync(String(path), 'utf8')
+      : 'gitdir: C:/repo/.git/worktrees/feature'
+  )
+  proveOrphan.mockResolvedValue(true)
 })
 afterEach(() => {
   Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform })
   vi.resetAllMocks()
   _resetWorktreeScanCacheForTests()
 })
-
-it.each([10, 100])(
-  'shares one native eligibility graph for %i equivalent overlapping authorizations',
-  async (population) => {
-    const reading = Promise.withResolvers<GitWorktreeInfo[]>()
-    graph.mockReturnValueOnce(reading.promise)
-    const signal = new AbortController().signal
-    const checks = Array.from({ length: population }, () =>
-      authorizeWindowsCheckout('C:/repo', root, true, { checkoutDeleteSignal: signal })
-    )
-    expect(graph).toHaveBeenCalledOnce()
-    reading.resolve([row])
-    expect(await Promise.all(checks)).toEqual(Array.from({ length: population }, () => true))
-    expect(graph.mock.calls[0]?.[1].signal).toBe(signal)
-  }
-)
-
-it('refuses nested preparation registrations and strict inventory errors', async () => {
-  graph.mockResolvedValueOnce([row, { ...row, path: `${root}/.orca-worktree-preparation` }])
-  await expect(authorizeWindowsCheckout('C:/repo', root, true, {})).rejects.toThrow(
-    'another registered worktree'
-  )
-  const failure = new Error('inventory failed')
-  graph.mockRejectedValueOnce(failure)
-  await expect(authorizeWindowsCheckout('C:/repo', root, true, {})).rejects.toBe(failure)
-  expect(removeChild).not.toHaveBeenCalled()
-})
-
-it.each(['status', 'recursive'] as const)(
-  'cancels the later %s read with the original checkout stop reason',
-  async (stage) => {
-    const controller = new AbortController()
-    const held = Promise.withResolvers<void>()
-    const entered = Promise.withResolvers<void>()
-    if (stage === 'status') {
-      clean.mockImplementation(async (_root, _force, options) => {
-        entered.resolve()
-        await waitForPromiseWithSignal(held.promise, options.signal)
-      })
-    } else {
-      graph
-        .mockImplementationOnce(async () => [row])
-        .mockImplementationOnce(async (_repo, options) => {
-          entered.resolve()
-          await waitForPromiseWithSignal(held.promise, options.signal)
-          return [row]
-        })
-    }
-    const reason = new Error('owner stopped')
-    const pending = authorizeWindowsCheckout('C:/repo', root, false, {
-      checkoutDeleteSignal: controller.signal
-    })
-    const rejected = expect(pending).rejects.toBe(reason)
-    await entered.promise
-    controller.abort(reason)
-    await rejected
-    expect(unlink).not.toHaveBeenCalled()
-  }
-)
 
 it('joins held children before cancelling the real repeated delete-time authorization', async () => {
   const controller = new AbortController()
@@ -170,22 +142,145 @@ it('joins held children before cancelling the real repeated delete-time authoriz
   expect(rmdir).not.toHaveBeenCalled()
 })
 
-it('honors distinct read and checkout signals without replacing either caller option', async () => {
-  const read = new AbortController()
-  const checkout = new AbortController()
-  const entered = Promise.withResolvers<void>()
-  graph.mockImplementation(async (_repo, options) => {
-    entered.resolve()
-    return waitForPromiseWithSignal(new Promise<GitWorktreeInfo[]>(() => {}), options.signal)
+it('refuses before sweeping children when a checkout replaces the pinned marker during ownership proof', async () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'orca-win-auth-race-'))
+  try {
+    const gitFile = join(scratch, '.git')
+    writeFileSync(gitFile, 'gitdir: C:/repo/.git/worktrees/feature\n')
+    const initialIno = lstatSync(gitFile, { bigint: true }).ino
+    graph.mockResolvedValue([])
+    proveOrphan.mockImplementationOnce(async () => {
+      unlinkSync(gitFile)
+      writeFileSync(gitFile, 'gitdir: C:/repo/.git/worktrees/restored\n')
+      readMarker.mockResolvedValue('gitdir: C:/repo/.git/worktrees/restored\n')
+      return true
+    })
+
+    await expect(
+      removeWindowsCheckout('C:/repo', scratch, true, {
+        expectedMarker: `C:/repo/.git/worktrees/feature#${initialIno}`
+      })
+    ).rejects.toThrow('A different checkout is now at')
+
+    expect(proveOrphan).toHaveBeenCalled()
+    expect(removeChild).not.toHaveBeenCalled()
+    expect(unlink).not.toHaveBeenCalled()
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+})
+
+it('refuses before sweeping children when a checkout replaces the pinned marker during directory enumeration', async () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'orca-win-readdir-race-'))
+  try {
+    const gitFile = join(scratch, '.git')
+    writeFileSync(gitFile, 'gitdir: C:/repo/.git/worktrees/feature\n')
+    const initialIno = lstatSync(gitFile, { bigint: true }).ino
+    names.mockImplementationOnce(async () => {
+      unlinkSync(gitFile)
+      writeFileSync(gitFile, 'gitdir: C:/repo/.git/worktrees/restored\n')
+      return ['unsaved.txt', '.git']
+    })
+
+    await expect(
+      removeWindowsCheckout('C:/repo', scratch, true, {
+        expectedMarker: `C:/repo/.git/worktrees/feature#${initialIno}`
+      })
+    ).rejects.toThrow('A different checkout is now at')
+
+    expect(names).toHaveBeenCalled()
+    expect(removeChild).not.toHaveBeenCalled()
+    expect(unlink).not.toHaveBeenCalled()
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+})
+
+it('skips child deletion and refuses non-empty folder when the pinned marker disappears during enumeration', async () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'orca-win-readdir-loss-'))
+  try {
+    const gitFile = join(scratch, '.git')
+    writeFileSync(gitFile, 'gitdir: C:/repo/.git/worktrees/feature\n')
+    const initialIno = lstatSync(gitFile, { bigint: true }).ino
+    names.mockImplementationOnce(async () => {
+      unlinkSync(gitFile)
+      stat.mockImplementation(async (path: string) => {
+        if (String(path).endsWith('.git') || String(path).endsWith('locked')) {
+          throw missing
+        }
+        return { isDirectory: () => true, isSymbolicLink: () => false }
+      })
+      rmdir.mockRejectedValue(Object.assign(new Error('not empty'), { code: 'ENOTEMPTY' }))
+      return ['unsaved.txt']
+    })
+
+    await expect(
+      removeWindowsCheckout('C:/repo', scratch, true, {
+        expectedMarker: `C:/repo/.git/worktrees/feature#${initialIno}`
+      })
+    ).rejects.toThrow('is no longer a Git worktree')
+
+    expect(removeChild).not.toHaveBeenCalled()
+    expect(unlink).not.toHaveBeenCalled()
+  } finally {
+    rmSync(scratch, { recursive: true, force: true })
+  }
+})
+
+it('refuses before sweeping children when a markerless root becomes a symlink during enumeration', async () => {
+  stat.mockImplementation(async (path: string) => {
+    if (String(path).endsWith('.git')) {
+      throw missing
+    }
+    return { isDirectory: () => true, isSymbolicLink: () => false, dev: 1, ino: 1 }
   })
-  const options = { signal: read.signal, checkoutDeleteSignal: checkout.signal }
-  const reason = new Error('checkout closing')
-  const rejected = expect(authorizeWindowsCheckout('C:/repo', root, true, options)).rejects.toBe(
-    reason
-  )
-  await entered.promise
-  checkout.abort(reason)
-  await rejected
-  expect(options.signal).toBe(read.signal)
-  expect(options.checkoutDeleteSignal).toBe(checkout.signal)
+  statBigInt.mockImplementation(async (path: string) => {
+    if (String(path).endsWith('.git')) {
+      throw missing
+    }
+    return { isDirectory: () => true, isSymbolicLink: () => false, dev: 1n, ino: 1n }
+  })
+  names.mockImplementationOnce(async () => {
+    statBigInt.mockImplementation(async (path: string) => {
+      if (String(path).endsWith('.git')) {
+        throw missing
+      }
+      return { isDirectory: () => false, isSymbolicLink: () => true, dev: 1n, ino: 1n }
+    })
+    return ['notes.txt']
+  })
+
+  await expect(
+    removeUnregisteredHostCheckout('/work/feature', undefined, { forbidAnyMarker: true })
+  ).rejects.toThrow('Refusing to delete unregistered worktree path')
+
+  expect(names).toHaveBeenCalledTimes(1)
+  expect(removeChild).not.toHaveBeenCalled()
+})
+
+it('distinguishes 64-bit directory inode IDs above Number.MAX_SAFE_INTEGER when rechecking root identity', async () => {
+  let rootIno = 9_007_199_254_745_092n
+  stat.mockImplementation(async (path: string) => {
+    if (String(path).endsWith('.git')) {
+      throw missing
+    }
+    return { isDirectory: () => true, isSymbolicLink: () => false, dev: 1, ino: Number(rootIno) }
+  })
+  statBigInt.mockImplementation(async (path: string) => {
+    if (String(path).endsWith('.git')) {
+      throw missing
+    }
+    return { isDirectory: () => true, isSymbolicLink: () => false, dev: 1n, ino: rootIno }
+  })
+  names.mockImplementationOnce(async () => {
+    rootIno = 9_007_199_254_745_093n
+    return ['notes.txt']
+  })
+
+  await expect(
+    removeUnregisteredHostCheckout('/work/feature', undefined, { forbidAnyMarker: true })
+  ).rejects.toThrow('A different checkout is now at')
+
+  expect(names).toHaveBeenCalledTimes(1)
+  expect(removeChild).not.toHaveBeenCalled()
 })

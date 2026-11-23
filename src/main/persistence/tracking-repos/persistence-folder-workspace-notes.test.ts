@@ -9,8 +9,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { rmSync, mkdtempSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import type { PersistedState } from '../../../shared/persisted-state-types'
-import { folderWorkspaceKey } from '../../../shared/workspace-scope'
+import type { PersistedState } from '../../../shared/orca-profiles/persisted-state-types'
+import { folderWorkspaceKey } from '../../../shared/workspace/identity/workspace-scope'
 
 const { loadUserSshConfigMock, sshConfigHostsToTargetsMock } = vi.hoisted(() => ({
   loadUserSshConfigMock: vi.fn(),
@@ -143,5 +143,53 @@ describe('Store', () => {
 
     expect((readDataFile() as PersistedState).folderWorkspaceDiffComments).toBeUndefined()
     expect((await createStore()).getFolderWorkspace('fw-1')?.diffComments ?? []).toEqual([])
+  })
+
+  it('keeps notes another client added when a stale client saves an edit and an add', async () => {
+    writeFolderWorkspaceProfile({
+      workspaces: [folderWorkspaceRecord()],
+      diffCommentsMap: { 'fw-1': [makeFolderNote('n', 'Original')] }
+    })
+    const store = await createStore()
+    const base = [makeFolderNote('n', 'Original')]
+
+    store.updateFolderWorkspace('fw-1', {
+      diffComments: [...base, makeFolderNote('m', 'Added elsewhere')],
+      diffCommentsBase: base
+    })
+    store.updateFolderWorkspace('fw-1', {
+      diffComments: [makeFolderNote('n', 'Edited'), makeFolderNote('p', 'Added here')],
+      diffCommentsBase: base
+    })
+    store.flush()
+
+    const saved = (await createStore()).getFolderWorkspace('fw-1')?.diffComments ?? []
+    expect(saved.map((note) => [note.id, note.body])).toEqual([
+      ['n', 'Edited'],
+      ['m', 'Added elsewhere'],
+      ['p', 'Added here']
+    ])
+  })
+
+  it('keeps a note deleted when a stale client saves an edit to it', async () => {
+    writeFolderWorkspaceProfile({
+      workspaces: [folderWorkspaceRecord()],
+      diffCommentsMap: { 'fw-1': [makeFolderNote('n', 'Original'), makeFolderNote('k', 'Kept')] }
+    })
+    const store = await createStore()
+    const base = [makeFolderNote('n', 'Original'), makeFolderNote('k', 'Kept')]
+
+    store.updateFolderWorkspace('fw-1', {
+      diffComments: [makeFolderNote('k', 'Kept')],
+      diffCommentsBase: base
+    })
+    store.updateFolderWorkspace('fw-1', {
+      diffComments: [makeFolderNote('n', 'Edited'), makeFolderNote('k', 'Kept')],
+      diffCommentsBase: base
+    })
+    store.flush()
+
+    const saved = (await createStore()).getFolderWorkspace('fw-1')?.diffComments ?? []
+    expect(saved.map((note) => [note.id, note.body])).toEqual([['k', 'Kept']])
   })
 })

@@ -1,14 +1,15 @@
-import { WorkspaceHookSettingsSchema } from '../../../shared/workspace-hook-settings-schema'
+import { WorkspaceHookSettingsSchema } from '../../../shared/workspace-setup/hooks/workspace-hook-settings-schema'
 import { z } from 'zod'
 import { isTuiAgent } from '../../../shared/agent-launch/catalog/tui-agent-config'
 import { TaskSourceContextSchema } from '../../../shared/work-items/task-source-context-schema'
 import { WorkspaceLinkedItemSchema } from '../../../shared/workspace-attachments/workspace-linked-item-schema'
 import { WorkspaceAttachmentsSchema } from '../../../shared/workspace-attachments/workspace-attachment-schema'
 import { isWorkspaceLinkedItemSourceContextMatch } from '../../../shared/workspace-attachments/workspace-linked-item-source-context'
-import { DiffCommentSchema } from '../../../shared/diff-comment-schema'
-import { normalizeExecutionHostId } from '../../../shared/execution-host'
+import { DiffCommentSchema } from '../../../shared/file-review/diff-comment-schema'
+import { normalizeExecutionHostId } from '../../../shared/execution-host/execution-host'
 import {
   FolderWorkspaceHookCreateShape,
+  FolderWorkspaceDelete,
   assertFolderWorkspaceStartup
 } from '../../../shared/rpc-contract/workspaces/folder-workspace-params'
 
@@ -188,7 +189,8 @@ export const FolderWorkspaceUpdateArgs = z.object({
       pendingFirstAgentMessageRename: z.boolean().optional(),
       firstAgentMessageRenameError: z.string().nullable().optional(),
       lastActivityAt: z.number().finite().optional(),
-      diffComments: z.array(DiffCommentSchema).optional()
+      diffComments: z.array(DiffCommentSchema).optional(),
+      diffCommentsBase: z.array(DiffCommentSchema).optional()
     })
     .superRefine(assertFolderWorkspaceLinkedSourceContextMatch)
 })
@@ -196,6 +198,8 @@ export const FolderWorkspaceUpdateArgs = z.object({
 export const FolderWorkspaceSelectorArgs = z.object({
   folderWorkspaceId: z.string().min(1)
 })
+
+export const FolderWorkspaceDeleteArgs = FolderWorkspaceDelete
 
 export const FolderWorkspacePathStatusArgs = z.discriminatedUnion('scope', [
   z.object({

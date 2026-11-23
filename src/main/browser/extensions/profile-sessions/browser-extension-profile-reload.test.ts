@@ -1,59 +1,89 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { InstalledBrowserExtension } from '../../../../shared/browser/extensions/browser-extension-types'
 
-const ID = 'nngceckbapebfimnlniiiahkandclblb'
-
 const mocks = vi.hoisted(() => ({
-  enabled: new Map<string, string[]>(),
-  prepare: vi.fn(async () => {}),
-  load: vi.fn(async (_profileId: string): Promise<unknown> => ({}))
+  loaded: new Set<string>(),
+  load: vi.fn(),
+  prepare: vi.fn(async () => {})
 }))
 
 vi.mock('../../sessions/profiles/browser-session-registry', () => ({
   browserSessionRegistry: {
-    listProfiles: () => [...mocks.enabled.keys()].map((id) => ({ id })),
-    getEnabledExtensionIds: (profileId: string) => mocks.enabled.get(profileId) ?? []
+    listProfiles: () => ['a', 'b', 'c'].map((id) => ({ id })),
+    getEnabledExtensionIds: () => ['ext']
   }
 }))
 vi.mock('../installation/browser-extension-load-directory', () => ({
   prepareBrowserExtensionDirectory: mocks.prepare
 }))
+vi.mock('../installation/browser-extension-list-changes', () => ({
+  notifyBrowserExtensionListChanged: vi.fn()
+}))
+vi.mock('./browser-extension-idle-kept-state', () => ({
+  noteBrowserExtensionReloadedWhileIdle: vi.fn(),
+  noteBrowserExtensionReloadPendingInIdleProfile: vi.fn()
+}))
+vi.mock('../declarative-net-request/session/browser-extension-dnr-store', () => ({
+  getBrowserExtensionDnrStore: () => ({ forgetSessionRulesOfOtherVersions: vi.fn() })
+}))
 vi.mock('./browser-extension-session-loader', () => ({
   getBrowserExtensionSessionForProfile: () => ({}),
   loadBrowserExtensionIntoProfile: mocks.load,
-  unloadBrowserExtensionFromProfile: vi.fn()
+  unloadBrowserExtensionFromProfile: (profileId: string) => mocks.loaded.delete(profileId)
 }))
 
 const { reloadBrowserExtensionWhereEnabled } = await import('./browser-extension-profile-reload')
+const { forgetBrowserExtensionLoadFailures, getBrowserExtensionLoadFailure } =
+  await import('./browser-extension-load-errors')
 
-// oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: reload reads only the id and passes the record through.
-const extension = { id: ID } as InstalledBrowserExtension
-
-function disable(profileId: string): void {
-  mocks.enabled.set(profileId, [])
+const extension: InstalledBrowserExtension = {
+  id: 'ext',
+  name: 'Ext',
+  version: '2.0.0',
+  path: '/ext',
+  source: 'unpacked',
+  iconPath: null,
+  permissions: [],
+  hostPermissions: [],
+  optionsPage: null
 }
 
-beforeEach(() => {
-  vi.clearAllMocks()
-  mocks.enabled = new Map([
-    ['default', [ID]],
-    ['work', [ID]]
-  ])
-})
-
-describe('reloadBrowserExtensionWhereEnabled', () => {
-  it('does not start the extension in a profile that turned it off during the copy', async () => {
-    mocks.prepare.mockImplementationOnce(async () => disable('default'))
-    await reloadBrowserExtensionWhereEnabled(extension, { refresh: true })
-    expect(mocks.load.mock.calls.map(([profileId]) => profileId)).toEqual(['work'])
+describe('reloading an extension in several profiles', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    forgetBrowserExtensionLoadFailures({})
+    mocks.loaded = new Set(['a', 'b', 'c'])
+    mocks.load.mockImplementation(async (profileId: string) => {
+      if (profileId === 'a') {
+        throw new Error('load failed in a')
+      }
+      mocks.loaded.add(profileId)
+    })
   })
 
-  it("still reloads other profiles when turning it off cancels one profile's load", async () => {
-    mocks.load.mockImplementationOnce(async () => {
-      disable('default')
-      throw new Error('The extension was turned off before it finished loading')
-    })
-    await expect(reloadBrowserExtensionWhereEnabled(extension)).resolves.toBeUndefined()
-    expect(mocks.load.mock.calls.map(([profileId]) => profileId)).toEqual(['default', 'work'])
+  it('still loads later profiles when an earlier one fails, then reports that failure', async () => {
+    await expect(reloadBrowserExtensionWhereEnabled(extension, { refresh: true })).rejects.toThrow(
+      'load failed in a'
+    )
+    expect([...mocks.loaded].sort()).toEqual(['b', 'c'])
+    expect(getBrowserExtensionLoadFailure('a', 'ext')).toBe('load failed in a')
+    expect(getBrowserExtensionLoadFailure('b', 'ext')).toBeNull()
+  })
+
+  it('stops at the first failure of a Web Store replace, whose caller rolls every profile back', async () => {
+    await expect(reloadBrowserExtensionWhereEnabled(extension)).rejects.toThrow('load failed in a')
+    expect(mocks.load).toHaveBeenCalledTimes(1)
+    expect(mocks.loaded.size).toBe(0)
+  })
+
+  it('shows a failed folder refresh as the load error of every profile it unloaded', async () => {
+    mocks.prepare.mockRejectedValueOnce(new Error('copy failed'))
+    await expect(reloadBrowserExtensionWhereEnabled(extension, { refresh: true })).rejects.toThrow(
+      'copy failed'
+    )
+    expect(mocks.load).not.toHaveBeenCalled()
+    for (const profileId of ['a', 'b', 'c']) {
+      expect(getBrowserExtensionLoadFailure(profileId, 'ext')).toBe('copy failed')
+    }
   })
 })

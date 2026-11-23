@@ -6,7 +6,7 @@ import {
 import type { PRCheckDetail } from '../../../shared/github/checks/check-types'
 
 import type { GitHubWorkItemDetails } from '../../../shared/github/work-items/work-item-types'
-import type { IssueSourcePreference } from '../../../shared/repo-types'
+import type { IssueSourcePreference } from '../../../shared/repository/repo-types'
 import { getPRChecks } from '../client/check/get-pr-checks'
 import { getPRComments } from '../client/fetch/get-pr-comments'
 import { getWorkItemWithRepository, getWorkItemByOwnerRepo } from '../client/fetch/get-work-item'
@@ -212,18 +212,23 @@ export async function getWorkItemDetails(
       }
 
       // Nested client reads own their semaphore permits, so they stay outside these permits.
+      const detailContext = withWorkItemDetailsPermit(() =>
+        getPRDetailContext(repoPath, item.number, resolvedRepository, connectionId, localGitOptions)
+      )
       const [{ viewedStates, participants }, metadata, files, comments] = await Promise.all([
-        withWorkItemDetailsPermit(() =>
-          getPRDetailContext(
-            repoPath,
-            item.number,
-            resolvedRepository,
-            connectionId,
-            localGitOptions
-          )
-        ),
-        withWorkItemDetailsPermit(() =>
-          getPRMetadata(repoPath, item.number, resolvedRepository, connectionId, localGitOptions)
+        detailContext,
+        detailContext.then(
+          ({ metadata }) =>
+            metadata ??
+            withWorkItemDetailsPermit(() =>
+              getPRMetadata(
+                repoPath,
+                item.number,
+                resolvedRepository,
+                connectionId,
+                localGitOptions
+              )
+            )
         ),
         withWorkItemDetailsPermit(() =>
           getPRFiles(repoPath, item.number, resolvedRepository, connectionId, localGitOptions)

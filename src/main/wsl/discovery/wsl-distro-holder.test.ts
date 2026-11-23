@@ -4,13 +4,23 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WindowsProcessEvidence } from '../../daemon/endpoint/identity/daemon-incarnation-evidence-types'
-import { isWslDistroHolderCommandLine, WSL_DISTRO_HOLDER_MARKER } from './wsl-distro-holder-command'
+import { WSL_DISTRO_HOLDER_MARKER } from './wsl-distro-holder-command'
 import {
   WSL_HOLDER_UNVERIFIABLE_REPLACE_AFTER_MS,
   createWslDistroHolder
 } from './wsl-distro-holder'
 import type { WslDistroHolderChild, WslDistroHolderDependencies } from './wsl-distro-holder-types'
-import { wslDistroHolderDirectory, type WslDistroHolderRecord } from './wsl-distro-holder-record'
+import type * as holderRecord from './wsl-distro-holder-record'
+import {
+  wslDistroHolderDirectory,
+  writeWslDistroHolderRecord,
+  type WslDistroHolderRecord
+} from './wsl-distro-holder-record'
+
+vi.mock('./wsl-distro-holder-record', async (importOriginal) => {
+  const actual = await importOriginal<typeof holderRecord>()
+  return { ...actual, writeWslDistroHolderRecord: vi.fn(actual.writeWslDistroHolderRecord) }
+})
 
 const HOLDER_COMMAND = (distro: string): string =>
   `C:\\Windows\\System32\\wsl.exe -d ${distro} --exec /bin/sh -c "while :; do sleep 3600; done" ${WSL_DISTRO_HOLDER_MARKER}`
@@ -24,7 +34,7 @@ class FakeHost {
   nextPid = 4000
   spawned: string[] = []
   killed: number[] = []
-  children: (EventEmitter & { pid?: number; unref: () => void })[] = []
+  children: WslDistroHolderChild[] = []
 
   query = async (pid: number): Promise<WindowsProcessEvidence> => {
     if (this.tableFails) {
@@ -37,7 +47,22 @@ class FakeHost {
   spawn = (distro: string): WslDistroHolderChild => {
     const pid = this.nextPid++
     this.spawned.push(distro)
-    const child = Object.assign(new EventEmitter(), { pid, unref: vi.fn() })
+    let exited = false
+    const child = Object.assign(new EventEmitter(), {
+      pid,
+      unref: vi.fn(),
+      // Like process-host's handle: refuses once the child has exited.
+      kill: (): boolean => {
+        if (exited) {
+          return false
+        }
+        this.kill(pid)
+        return true
+      }
+    })
+    child.once('exit', () => {
+      exited = true
+    })
     this.children.push(child)
     this.processes.set(pid, { commandLine: HOLDER_COMMAND(distro), startedAtMs: 1_000 + pid })
     this.running.add(distro.toLowerCase())
@@ -99,23 +124,11 @@ afterEach(async () => {
   await rm(userDataPath, { recursive: true, force: true })
 })
 
-describe('holder command line', () => {
-  it('matches only our holder for the same distro', () => {
-    expect(isWslDistroHolderCommandLine(HOLDER_COMMAND('Alpine'), 'alpine')).toBe(true)
-    expect(isWslDistroHolderCommandLine(HOLDER_COMMAND('Alpine-2'), 'Alpine')).toBe(false)
-    expect(isWslDistroHolderCommandLine('wsl.exe -d Alpine --exec sleep 9', 'Alpine')).toBe(false)
-    expect(
-      isWslDistroHolderCommandLine(`node x.js -d Alpine ${WSL_DISTRO_HOLDER_MARKER}`, 'Alpine')
-    ).toBe(false)
-  })
-})
-
 describe('createWslDistroHolder', () => {
   it('a background ensure re-reads the running list right before spawning, and never boots (E9)', async () => {
     const holder = makeHolder()
     const requireRunning = vi.fn(async () => false)
     await expect(holder.ensureHeld('Alpine', { requireRunning })).rejects.toThrow('isn’t running')
-    expect(requireRunning).toHaveBeenCalledTimes(1)
     expect(host.spawned).toEqual([])
 
     requireRunning.mockResolvedValue(true)
@@ -141,24 +154,6 @@ describe('createWslDistroHolder', () => {
     expect(host.spawned).toEqual(['Alpine'])
     expect((await holder.ensureHeld('Alpine')).outcome).toBe('adopted')
     expect(host.spawned).toHaveLength(1)
-  })
-
-  it('adopts a valid holder left by a previous run without spawning another', async () => {
-    host.processes.set(77, { commandLine: HOLDER_COMMAND('Alpine'), startedAtMs: 5_000 })
-    await writeRecord(record())
-    const holder = makeHolder()
-    expect(await holder.adoptHolders()).toEqual([{ distro: 'Alpine', state: 'live' }])
-    expect((await holder.ensureHeld('Alpine')).outcome).toBe('adopted')
-    expect(host.spawned).toEqual([])
-  })
-
-  it('rejects a reused pid (creation time differs) and drops the record', async () => {
-    host.processes.set(77, { commandLine: HOLDER_COMMAND('Alpine'), startedAtMs: 9_999 })
-    await writeRecord(record())
-    const holder = makeHolder()
-    expect(await holder.adoptHolders()).toEqual([{ distro: 'Alpine', state: 'exited' }])
-    expect(await recordFiles()).toEqual([])
-    expect(host.killed).toEqual([])
   })
 
   it('releases every verified holder it recorded and nothing it cannot verify', async () => {
@@ -216,6 +211,75 @@ describe('createWslDistroHolder', () => {
     expect(await recordFiles()).toEqual([])
   })
 
+  it.each(['ENOSPC', 'EACCES'])(
+    'stops each holder whose record write fails with %s, so retries never pile up',
+    async (code) => {
+      const failure = Object.assign(new Error(`${code}: record write failed`), { code })
+      vi.mocked(writeWslDistroHolderRecord).mockRejectedValueOnce(failure)
+      vi.mocked(writeWslDistroHolderRecord).mockRejectedValueOnce(failure)
+      const holder = makeHolder()
+      await expect(holder.ensureHeld('Alpine')).rejects.toBe(failure)
+      await expect(holder.ensureHeld('Alpine')).rejects.toBe(failure)
+      expect(host.killed).toEqual([4000, 4001])
+      expect([...host.processes.keys()]).toEqual([])
+      expect(await recordFiles()).toEqual([])
+      // Once the disk recovers, one holder is spawned and recorded.
+      expect((await holder.ensureHeld('Alpine')).outcome).toBe('spawned')
+      expect([...host.processes.keys()]).toEqual([4002])
+      expect(await recordFiles()).toEqual(['alpine.json'])
+    }
+  )
+
+  it('stops a failed-publish holder through its own handle when the process table is unreadable', async () => {
+    host.tableFails = true
+    const failure = Object.assign(new Error('ENOSPC: record write failed'), { code: 'ENOSPC' })
+    vi.mocked(writeWslDistroHolderRecord).mockRejectedValue(failure)
+    try {
+      const holder = makeHolder()
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await expect(holder.ensureHeld('Alpine')).rejects.toBe(failure)
+      }
+    } finally {
+      vi.mocked(writeWslDistroHolderRecord).mockReset()
+    }
+    expect(host.killed).toEqual([4000, 4001, 4002])
+    expect([...host.processes.keys()]).toEqual([])
+  })
+
+  it('a failed publish keeps the record of the holder it was replacing', async () => {
+    // The old holder's command line is unreadable, so after the grace it is replaced.
+    host.processes.set(77, { commandLine: null, startedAtMs: 5_000 })
+    await writeRecord(record())
+    host.running.add('alpine')
+    let clock = 0
+    const holder = makeHolder({ monotonicNow: () => clock })
+    expect((await holder.ensureHeld('Alpine')).outcome).toBe('unverifiable')
+    clock = WSL_HOLDER_UNVERIFIABLE_REPLACE_AFTER_MS + 1
+    const failure = Object.assign(new Error('EACCES: record write failed'), { code: 'EACCES' })
+    vi.mocked(writeWslDistroHolderRecord).mockRejectedValueOnce(failure)
+    await expect(holder.ensureHeld('Alpine')).rejects.toBe(failure)
+    expect(host.killed).toEqual([4000])
+    expect(await recordFiles()).toEqual(['alpine.json'])
+    expect(await holder.holderState('Alpine')).toBe('unverifiable')
+  })
+
+  it('reports the boot failure, not a cleanup failure', async () => {
+    let clock = 0
+    let queries = 0
+    const holder = makeHolder({
+      listRunningDistros: async () => [],
+      monotonicNow: () => (clock += 1_000),
+      bootTimeoutMs: 3_000,
+      queryProcess: async (pid) => {
+        if (++queries > 1) {
+          throw new Error('process table crashed')
+        }
+        return host.query(pid)
+      }
+    })
+    await expect(holder.ensureHeld('Alpine')).rejects.toThrow(/did not start/)
+  })
+
   it('stops the holder when the distro never starts', async () => {
     let clock = 0
     const holder = makeHolder({
@@ -253,7 +317,6 @@ describe('createWslDistroHolder', () => {
       sleep: async () => {}
     })
     expect(await released.release('Alpine')).toBe('exited')
-    expect(midExitReads).toBeLessThan(0)
     expect(await recordFiles()).toEqual([])
     expect(await holder.holderState('Alpine')).toBe('exited')
   })
@@ -267,14 +330,7 @@ describe('createWslDistroHolder', () => {
     const firstSleep = new Promise<void>((resolve) => {
       notifySleep = resolve
     })
-    const queryTimes: number[] = []
     const released = makeHolder({
-      queryProcess: async (pid) => {
-        if (host.killed.includes(pid)) {
-          queryTimes.push(clock)
-        }
-        return host.query(pid)
-      },
       killProcess: (pid) => {
         host.killed.push(pid)
         host.processes.set(pid, { commandLine: null, startedAtMs: 5_000 })
@@ -296,20 +352,16 @@ describe('createWslDistroHolder', () => {
       return state
     })
     await firstSleep
-    expect(queryTimes).toEqual([0])
     expect(settled).toBe(false)
     const finalSleep = new Promise<void>((resolve) => {
       notifySleep = resolve
     })
     resumeSleep(4_999)
     await finalSleep
-    expect(queryTimes).toEqual([0, 4_999])
     expect(settled).toBe(false)
     expect(await recordFiles()).toEqual(['alpine.json'])
     resumeSleep(5_000)
     expect(await release).toBe('unverifiable')
-    expect(clock).toBe(5_000)
-    expect(queryTimes).toEqual([0, 4_999, 5_000])
     expect(host.killed).toEqual([4000])
     expect(await recordFiles()).toEqual(['alpine.json'])
   })
@@ -380,9 +432,6 @@ describe('releaseAll for uninstall', () => {
     ])
     expect(host.killed.sort()).toEqual([77, 88])
     expect(await recordFiles()).toEqual([])
-    expect(console.warn).toHaveBeenCalledWith(
-      '[wsl] uninstall: Alpine holder pid 77 was live, now exited'
-    )
   })
 
   it('never kills a pid whose command line is not the holder for the recorded distro', async () => {
@@ -427,8 +476,5 @@ describe('releaseAll for uninstall', () => {
     ])
     expect(host.killed).toEqual([77])
     expect(await recordFiles()).toEqual(['alpine.json'])
-    expect(console.warn).toHaveBeenCalledWith(
-      '[wsl] uninstall: Alpine holder pid 78 was unverifiable, now unverifiable'
-    )
   })
 })

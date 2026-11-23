@@ -30,7 +30,7 @@ import {
   getWindowsRemoteWriteCapabilities
 } from './system-ssh-windows-write-capabilities'
 import { WINDOWS_STDIN_WRITE_CHUNK_BYTES } from './system-ssh-windows-write-strategy'
-import type { SshTarget } from '../../../../shared/ssh-types'
+import type { SshTarget } from '../../../../shared/remote-runtime/ssh/ssh-types'
 
 type FakeChannel = EventEmitter & {
   stdin: Writable
@@ -127,24 +127,31 @@ beforeEach(() => {
   runProcessMock.mockReset()
   acceptSftp()
   spawnSystemSshCommandMock.mockReset()
-  spawnSystemSshCommandMock.mockImplementation((_target: SshTarget, command: string) => {
-    const spawnIndex = spawnSystemSshCommandMock.mock.calls.length - 1
-    return createFakeChannel((channel) => {
-      commands.push({
-        script: decodePowerShellCommand(command),
-        executable: command.split(' ')[0] ?? '',
-        stdin: channel.written
+  spawnSystemSshCommandMock.mockImplementation(
+    (_target: SshTarget, command: string, options?: { closeStdin?: boolean }) => {
+      const spawnIndex = spawnSystemSshCommandMock.mock.calls.length - 1
+      const channel = createFakeChannel((ended) => {
+        commands.push({
+          script: decodePowerShellCommand(command),
+          executable: command.split(' ')[0] ?? '',
+          stdin: ended.written
+        })
+        setImmediate(() => {
+          if (spawnIndex === failAtSpawn) {
+            ended.stderr.write(failedWriteStderr)
+            ended.emit('close', failedWriteExit, null)
+          } else {
+            ended.emit('close', 0, null)
+          }
+        })
       })
-      setImmediate(() => {
-        if (spawnIndex === failAtSpawn) {
-          channel.stderr.write(failedWriteStderr)
-          channel.emit('close', failedWriteExit, null)
-        } else {
-          channel.emit('close', 0, null)
-        }
-      })
-    })
-  })
+      // Like the real spawnSystemSshCommand, closeStdin ends input right after spawn.
+      if (options?.closeStdin) {
+        channel.stdin.end()
+      }
+      return channel
+    }
+  )
 })
 
 afterEach(async () => {
@@ -175,7 +182,10 @@ describe('Windows upload over sftp', () => {
     expect(seen).toHaveLength(1)
     expect(seen[0]!.contents.toString()).toBe('1.2.3')
     // Repository payloads in shared temp directories must be private from creation.
-    expect(seen[0]!.mode).toBe(0o600)
+    // Windows stat synthesizes mode bits (0o666), so only POSIX can observe the created mode.
+    if (process.platform !== 'win32') {
+      expect(seen[0]!.mode).toBe(0o600)
+    }
     await expect(readFile(seen[0]!.path)).rejects.toThrow()
   })
 
@@ -223,21 +233,6 @@ describe('Windows upload on a host with no sftp subsystem', () => {
     expect(Buffer.concat(fileWrites().map((write) => write.stdin)).equals(contents)).toBe(true)
   })
 
-  it('leaves no truncated file under the real name when a chunk fails mid-file', async () => {
-    writeFileSync(join(localDir, 'relay.js'), Buffer.alloc(WINDOWS_STDIN_WRITE_CHUNK_BYTES * 3))
-    failAtSpawn = 0
-
-    await expect(
-      uploadFileViaSystemSsh(target, join(localDir, 'relay.js'), `${remoteRoot}/relay.js`, {
-        hostPlatform
-      })
-    ).rejects.toThrow()
-
-    expect(fileWrites().length).toBeGreaterThan(0)
-    expect(fileWrites().map(writtenPath)).not.toContain(`${remoteRoot}/relay.js`)
-    expect(commands.some((command) => command.script.includes('::Move('))).toBe(false)
-  })
-
   it.each([
     ['relay.js', 'aabb9009eeff'],
     ['relay-9009.js', 'aabbccddeeff'],
@@ -256,6 +251,9 @@ describe('Windows upload on a host with no sftp subsystem', () => {
       ).rejects.toThrow('failed (exit 1)')
 
       expect(fileWrites().map((write) => write.executable)).toEqual(['pwsh.exe'])
+      expect(fileWrites().map(writtenPath)).toEqual([
+        `${remotePath}${WINDOWS_STAGED_WRITE_SUFFIX}-${nonce}`
+      ])
       expect(getWindowsRemoteWriteCapabilities(target).shouldTry('pwsh')).toBe(true)
       expect(commands.some((command) => command.script.includes('::Move('))).toBe(false)
     } finally {

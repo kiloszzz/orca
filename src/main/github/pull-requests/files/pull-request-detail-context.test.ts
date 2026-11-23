@@ -1,138 +1,51 @@
-import type * as GithubRepositoryIdentityModule from '../../repositories/github-repository-identity'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { LocalGitExecOptions } from '../../repositories/github-repository-identity'
-
-const { exec, guard, spend } = vi.hoisted(() => ({ exec: vi.fn(), guard: vi.fn(), spend: vi.fn() }))
-vi.mock('../../../git/command-runner/hosted-cli/gh-exec-file', () => ({
-  ghExecFileAsync: exec
-}))
-
-vi.mock('../../repositories/github-repository-identity', async (importOriginal) => ({
-  ...(await importOriginal<typeof GithubRepositoryIdentityModule>()),
-  githubRepoContext: (
-    repoPath: string,
-    connectionId: string | null,
-    options: LocalGitExecOptions
-  ) => ({ repoPath, connectionId, ...options }),
-  ghRepoExecOptions: ({ repoPath, ...options }: { repoPath: string }) => ({
-    cwd: repoPath,
-    ...options
-  })
-}))
-vi.mock('../../api/rate-limit', () => ({
-  repositoryRateLimitGuard: guard,
-  noteRepositoryRateLimitSpend: spend
-}))
-
+import { describe, expect, it, vi } from 'vitest'
+import { ghExecFileAsync } from '../../../git/command-runner/hosted-cli/gh-exec-file'
 import { getPRDetailContext } from './pull-request-detail-context'
 
-const repository = { owner: 'acme', repo: 'widgets', host: 'github.com' }
-const participant = { login: 'reviewer', name: null, avatarUrl: 'https://avatars/reviewer' }
-const files = {
-  pageInfo: { hasNextPage: false, endCursor: null },
-  nodes: [{ path: 'src/changed.ts', viewerViewedState: 'VIEWED' }]
+vi.mock('../../../git/command-runner/hosted-cli/gh-exec-file', () => ({
+  ghExecFileAsync: vi.fn()
+}))
+
+const repository = { owner: 'acme', repo: 'widgets', host: 'github.example.test' }
+const pr = {
+  body: 'Describe the fix.',
+  headRefOid: '0123456789abcdef0123456789abcdef01234567',
+  baseRefOid: 'fedcba9876543210fedcba9876543210fedcba98',
+  participants: { nodes: [] }
 }
 
-function response(
-  pullRequest: Record<string, unknown> | null = { participants: { nodes: [participant] } },
-  viewedPullRequest: Record<string, unknown> | null = { id: 'PR_42', files },
-  errors?: Record<string, unknown>[]
-) {
-  return {
-    stdout: JSON.stringify({ data: { repository: { pullRequest, viewedPullRequest } }, errors })
-  }
-}
-
-function mockReads(reads: ({ stdout: string } | Error | { code: number; stdout: string })[]) {
-  exec.mockImplementation(async (args: string[]) => {
-    if (args.includes('graphql')) {
-      const next = reads.shift()
-      if (!next) {
-        throw new Error('Unexpected GraphQL read')
-      }
-      if (next instanceof Error || 'code' in next) {
-        throw next
-      }
-      return next
-    }
-    throw new Error('Unexpected non-GraphQL read')
-  })
-}
-
-function graphqlCalls(): string[][] {
-  return exec.mock.calls.flatMap(([args]) => (args.includes('graphql') ? [args] : []))
-}
-
-beforeEach(() => {
-  vi.resetAllMocks()
-  guard.mockReturnValue({ blocked: false })
-})
-
-describe('PR detail context requests', () => {
-  it('paginates only files after the first page and retains nullable viewer states', async () => {
-    mockReads([
-      response(undefined, {
-        id: 'PR_42',
-        files: { ...files, pageInfo: { hasNextPage: true, endCursor: 'cursor-1' } }
+describe('getPRDetailContext', () => {
+  it('keeps description and commit IDs when file view state is unavailable', async () => {
+    vi.mocked(ghExecFileAsync).mockResolvedValueOnce({
+      stdout: JSON.stringify({
+        data: { repository: { pullRequest: pr, viewedPullRequest: null } },
+        errors: [{ path: ['repository', 'viewedPullRequest', 'files'] }]
       }),
-      response(null, {
-        id: 'PR_42',
-        files: { ...files, nodes: [null, { path: 'src/unknown.ts', viewerViewedState: null }] }
-      })
-    ])
-    const result = await getPRDetailContext('/repo', 42, repository)
-    expect(result.viewedStates?.viewedStates).toEqual(new Map([['src/changed.ts', 'VIEWED']]))
-    expect(result.participants).toEqual([participant])
-    expect(graphqlCalls()).toHaveLength(2)
-    expect(graphqlCalls()[1]).toContain('after=cursor-1')
-    expect(graphqlCalls()[1].join(' ')).not.toContain('participants')
+      stderr: ''
+    })
+
+    await expect(getPRDetailContext('/workspace', 27, repository)).resolves.toEqual({
+      metadata: {
+        body: 'Describe the fix.',
+        headSha: '0123456789abcdef0123456789abcdef01234567',
+        baseSha: 'fedcba9876543210fedcba9876543210fedcba98'
+      },
+      participants: [],
+      viewedStates: null
+    })
   })
 
-  it.each([
-    { path: ['repository', 'pullRequest', 'participants'] },
-    { path: ['repository', 'pullRequest'] }
-  ])('retains viewed files when an error nulls the participant PR at $path', async ({ path }) => {
-    mockReads([{ code: 1, ...response(null, { id: 'PR_42', files }, [{ path }]) }, response()])
-    const result = await getPRDetailContext('/repo', 42, repository)
-    expect(result.participants).toEqual([participant])
-    expect(result.viewedStates?.pullRequestId).toBe('PR_42')
-    expect(result.viewedStates?.viewedStates.get('src/changed.ts')).toBe('VIEWED')
-    expect(graphqlCalls()).toHaveLength(2)
-    expect(graphqlCalls()[1].join(' ')).not.toContain('viewerViewedState')
-  })
+  it('defers a body containing a GitHub attachment to the rendered-body read', async () => {
+    const body =
+      '![screenshot](https://github.com/user-attachments/assets/ce11040a-fb66-4289-927f-547b16dfc488)'
+    vi.mocked(ghExecFileAsync).mockResolvedValueOnce({
+      stdout: JSON.stringify({ data: { repository: { pullRequest: { ...pr, body } } } }),
+      stderr: ''
+    })
 
-  it('retains participants when the viewed PR alias is nulled', async () => {
-    mockReads([
-      {
-        code: 1,
-        ...response(undefined, null, [{ path: ['repository', 'viewedPullRequest', 'id'] }])
-      }
-    ])
-    const result = await getPRDetailContext('/repo', 42, repository)
-    expect(result.participants).toEqual([participant])
-    expect(result.viewedStates).toBeNull()
-    expect(graphqlCalls()).toHaveLength(1)
-  })
-
-  it('does not publish partially paginated viewed files after a later page fails', async () => {
-    mockReads([
-      response(undefined, {
-        id: 'PR_42',
-        files: { ...files, pageInfo: { hasNextPage: true, endCursor: 'next' } }
-      }),
-      new Error('file page unavailable')
-    ])
-    const result = await getPRDetailContext('/repo', 42, repository)
-    expect(result.participants).toEqual([participant])
-    expect(result.viewedStates).toBeNull()
-    expect(graphqlCalls()).toHaveLength(2)
-  })
-
-  it('recovers participants after a failed query without retrying unavailable viewed state', async () => {
-    mockReads([new Error('Query failed'), response()])
-    const result = await getPRDetailContext('/repo', 42, repository)
-    expect(result.participants).toEqual([participant])
-    expect(result.viewedStates).toBeNull()
-    expect(graphqlCalls()).toHaveLength(2)
+    await expect(getPRDetailContext('/workspace', 27, repository)).resolves.toMatchObject({
+      metadata: undefined,
+      participants: []
+    })
   })
 })

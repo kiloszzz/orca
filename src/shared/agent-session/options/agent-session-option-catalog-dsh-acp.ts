@@ -1,9 +1,9 @@
-import type { AgentSessionModelOption } from '../agent-session-wire'
+import type { AgentSessionModelOption } from './model-catalog/agent-session-model-option'
 import type {
   AgentSessionOptionCatalog,
   CatalogModel,
   CatalogOption
-} from './agent-session-option-catalog-types'
+} from './catalog-providers/agent-session-option-catalog-types'
 
 const DSH_ACP_EFFORT_CHOICES = [
   { value: 'off', label: 'Off', description: 'Use for simple tasks that do not need reasoning.' },

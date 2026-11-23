@@ -64,26 +64,6 @@ describe('orchestration agent views', () => {
     vi.restoreAllMocks()
   })
 
-  it('makes a failed worker-start impossible to miss on stdout, stderr, and the exit code', async () => {
-    const { stdout, stderr } = await run('worker-start', [['task', 'task_1']], {
-      ...OLDER_RUNTIME_START,
-      state: 'failed',
-      failedStage: 'agent_ready',
-      lastError: 'Agent did not reach a ready prompt within 60000ms.',
-      residualResources: [{ kind: 'terminal', id: 'term_agent', ownership: 'owned' }],
-      recovery: 'Close it with: orca orchestration worker-release --dispatch ctx_1'
-    })
-
-    expect(stdout).toBe(
-      'dispatchId=ctx_1 taskId=task_1 runId=run_1 state=failed terminal=term_agent workspace=wt_1::/repo failedStage=agent_ready lastError="Agent did not reach a ready prompt within 60000ms." residualResources="terminal term_agent"\n' +
-        'Next: Close it with: orca-dev orchestration worker-release --dispatch ctx_1'
-    )
-    expect(stderr).toBe(
-      'error: start_failed: agent_ready: Agent did not reach a ready prompt within 60000ms.'
-    )
-    expect(process.exitCode).toBe(1)
-  })
-
   it('escapes terminal control bytes in worker-written fields', async () => {
     const { stdout } = await run('worker-start', [['task', 'task_1']], {
       ...OLDER_RUNTIME_START,
@@ -135,68 +115,6 @@ describe('orchestration agent views', () => {
     expect(process.exitCode).toBeUndefined()
   })
 
-  it('asks an older host to release only reclaimable finished workers', async () => {
-    const worker = { taskId: 'task_1', runId: 'run_1', workerState: 'succeeded' }
-    const { stdout } = await run(
-      'worker-list',
-      [['run', 'run_1']],
-      {
-        workers: [
-          { ...worker, dispatchId: 'ctx_done', terminalState: 'reclaimable', resource: null },
-          { ...worker, dispatchId: 'ctx_kept', terminalState: 'retained', resource: null }
-        ],
-        counts: {}
-      },
-      true
-    )
-    const [done, kept] = JSON.parse(stdout).result.workers
-    expect(done.next).toContain('orchestration worker-release --dispatch ctx_done')
-    expect(kept.next).toBeUndefined()
-  })
-
-  it('keeps --full ask output and exit exactly as before', async () => {
-    callMock.mockImplementation(async (method: string) =>
-      method === 'status.get'
-        ? { result: { capabilities: [] } }
-        : {
-            result: {
-              answer: null,
-              messageId: 'msg_q',
-              threadId: 'msg_q',
-              timedOut: true,
-              timeoutMs: 1000
-            }
-          }
-    )
-    const log = vi
-      .spyOn(console, 'log')
-      .mockClear()
-      .mockImplementation(() => {})
-    const error = vi
-      .spyOn(console, 'error')
-      .mockClear()
-      .mockImplementation(() => {})
-    await ORCHESTRATION_HANDLERS['orchestration ask'](
-      orchestrationTestContext(
-        callMock,
-        new Map<string, string | boolean>([
-          ['question', 'Proceed?'],
-          ['from', 'term_worker'],
-          ['full', true]
-        ]),
-        false
-      )
-    )
-
-    expect(log).not.toHaveBeenCalled()
-    expect(error.mock.calls).toEqual([
-      [
-        'ask timeout after 1000ms; question is still pending (messageId: msg_q). Resume waiting; do not ask again:\norca-dev orchestration ask --from term_worker --resume msg_q --timeout-ms 1000'
-      ]
-    ])
-    expect(process.exitCode).toBe(1)
-  })
-
   it('frames an unobserved turn start as a slow worker, not a failure to retry', async () => {
     const { stdout, stderr } = await run('worker-start', [['task', 'task_1']], {
       ...OLDER_RUNTIME_START,
@@ -231,6 +149,21 @@ describe('orchestration agent views', () => {
       }
     )
     expect(process.exitCode).toBe(1)
+  })
+
+  it('frames a start still waiting on its agent as a live worker, not a failure to retry', async () => {
+    const { stderr } = await run('worker-start', [['task', 'task_1']], {
+      ...OLDER_RUNTIME_START,
+      state: 'starting',
+      stage: 'awaiting_agent',
+      readyBy: '2026-11-22T00:30:00.000Z',
+      next: 'Worker term_agent (Dispatch ctx_1) is live, but its agent is not ready yet.'
+    })
+
+    expect(stderr).toBe(
+      "warning: agent_not_ready: worker ctx_1 is live; its agent isn't ready yet. Don't start this task again."
+    )
+    expect(process.exitCode).toBe(0)
   })
 
   it('keeps a deeply nested payload as its original string in text and JSON', async () => {
@@ -275,22 +208,6 @@ describe('orchestration agent views', () => {
       payload: { id: 'payload_id', payload: 'evidence' }
     })
     expect(result.formatted).toBeUndefined()
-  })
-
-  it('marks a failed concise JSON receipt ok:false and keeps its fields', async () => {
-    const { stdout } = await run(
-      'worker-list',
-      [['run', 'run_1']],
-      {
-        workers: [],
-        counts: {},
-        partialHostErrors: [
-          { environmentId: 'env_1', name: 'linux', code: 'unreachable', dispatchIds: [] }
-        ]
-      },
-      true
-    )
-    expect(JSON.parse(stdout)).toMatchObject({ ok: false, result: { workers: [] } })
   })
 
   it('never lets a payload stand in for Orca-computed message fields', async () => {

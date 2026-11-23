@@ -7,7 +7,7 @@ import {
 import { openTranscriptReadStream } from '../../../native-chat/transcript-filesystem/wsl-transcript-fs-access'
 import { zstdTranscriptStream } from '../../../native-chat/transcript-streaming/transcript-zstd-decompression'
 import type { AiVaultSession } from '../../../../shared/ai-vault/contracts/ai-vault-types'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
+import type { ExecutionHostId } from '../../../../shared/execution-host/execution-host'
 import type { FileWithMtime } from '../../session-scanner-types'
 import type { TranscriptMessageSink } from '../../transcripts/session-transcript-consumers'
 import {
@@ -18,7 +18,7 @@ import {
 import { addSessionContent } from '../../parsing/session-scanner-messages'
 import { parseJsonObject } from '../../parsing/session-json-object'
 import { arrayValue, asRecord } from '../../parsing/session-record-fields'
-import { extractString } from '../../../../shared/trimmed-string'
+import { extractString } from '../../../../shared/text/trimmed-string'
 import {
   extractContentText,
   normalizeTitleText

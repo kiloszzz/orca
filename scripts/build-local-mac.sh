@@ -200,9 +200,9 @@ run env \
 # 7. Sign & verify
 ENTITLEMENTS_PATH="$ROOT_DIR/resources/build/entitlements.mac.plist"
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
-  run codesign --force --sign - --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH"
+  run codesign --force --deep --sign - --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH"
 else
-  run codesign --force --sign "$SIGN_IDENTITY" --timestamp=none --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH"
+  run codesign --force --deep --sign "$SIGN_IDENTITY" --timestamp=none --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH"
 fi
 run codesign --verify --verbose=2 "$APP_PATH"
 

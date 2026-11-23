@@ -1,7 +1,7 @@
 import { readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { resolveAbsoluteDirOverride } from '../../shared/absolute-dir-override'
+import { resolveAbsoluteDirOverride } from '../../shared/file-access/absolute-dir-override'
 import { directoryTranscriptImport } from '../native-chat/conversation-adoption/structured-agent-cli-conversations'
 
 export const DSH_ACP_SESSION_TRANSCRIPT_FILE = 'session.v4.jsonl.zstd'

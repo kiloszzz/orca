@@ -1,3 +1,4 @@
+import '../../../shared/remote-runtime/host-store/environment-store-worker-test-fixture'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,7 +9,8 @@ import {
   UBUNTU,
   makeConnector
 } from '../../wsl/host-lifecycle/__tests__/wsl-host-service-test-connector'
-import { connectWslMoveHostService } from './wsl-move-host-connect'
+import type { WslHostStatus } from '../../../shared/remote-runtime/wsl-hosts/wsl-host-types'
+import { connectWslMoveHostService, wslMoveHostServerState } from './wsl-move-host-connect'
 
 const removal = vi.hoisted(() => ({ pending: false }))
 vi.mock(
@@ -18,8 +20,8 @@ vi.mock(
     return {
       ...actual,
       // E11 (#33843): `pendingStop` is optional until that PR lands, so the record gains it here.
-      findWslHostDeployment: (...args: Parameters<typeof actual.findWslHostDeployment>) => {
-        const record = actual.findWslHostDeployment(...args)
+      findWslHostDeployment: async (...args: Parameters<typeof actual.findWslHostDeployment>) => {
+        const record = await actual.findWslHostDeployment(...args)
         return record && removal.pending ? { ...record, pendingStop: { reason: 'x' } } : record
       }
     }
@@ -49,7 +51,7 @@ describe('the move driver reaching its WSL host', () => {
     await service.add({ distro: 'Ubuntu' })
     await connector.disconnect('Ubuntu')
     connector.distro.state = 'stopped'
-    service.handleConnectionChange('Ubuntu', null, {
+    await service.handleConnectionChange('Ubuntu', null, {
       state: 'distro-stopped',
       terminals: 'exited',
       recovering: false
@@ -72,7 +74,7 @@ describe('the move driver reaching its WSL host', () => {
 
   it("a user's move connects a parked host with no visible work (E9)", async () => {
     const { connector, service } = await stoppedAndParkedHost()
-    expect(service.hasUserVisibleWork('Ubuntu')).toBe(false)
+    expect(await service.hasUserVisibleWork('Ubuntu')).toBe(false)
     await expect(connectWslMoveHostService(service, userDataPath, 'Ubuntu', 'user')).resolves.toBe(
       true
     )
@@ -116,5 +118,28 @@ describe('the move driver reaching its WSL host', () => {
     }
     expect(connector.connect).not.toHaveBeenCalled()
     expect(connector.disconnect).not.toHaveBeenCalled()
+  })
+})
+
+describe('what a host lacking the WSL capability tells the move', () => {
+  const ready: WslHostStatus = {
+    environmentId: 'wsl:ubuntu',
+    distro: 'Ubuntu',
+    state: 'ready',
+    detail: null
+  }
+  const stateFor = (status: Partial<WslHostStatus>) =>
+    wslMoveHostServerState({ getStatuses: () => [{ ...ready, ...status }] }, 'wsl:ubuntu')
+  const deferral = (code: string) => ({ candidateVersion: '1', code, reason: '', forceable: false })
+
+  it('names the restart only for the not-started-as-WSL-host deferral', () => {
+    expect(stateFor({ deferredUpdate: deferral('orcad_not_started_as_wsl_host') })).toEqual({
+      serverState: 'restart-offered'
+    })
+    expect(stateFor({ deferredUpdate: deferral('orcad_update_terminals_running') })).toEqual({
+      serverState: 'update-pending'
+    })
+    expect(stateFor({ deferredUpdate: null })).toEqual({ serverState: 'current' })
+    expect(stateFor({ state: 'connecting' })).toEqual({})
   })
 })

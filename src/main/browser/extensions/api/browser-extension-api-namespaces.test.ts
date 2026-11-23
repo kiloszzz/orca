@@ -141,7 +141,7 @@ const extensionSession = {
       (_filter: unknown, callback: (details: Record<string, unknown>) => void) => callback
     )
   },
-  protocol: { handle: vi.fn(), unhandle: vi.fn() },
+  protocol: { handle: vi.fn(), unhandle: vi.fn(), isProtocolHandled: vi.fn(() => true) },
   extensions: Object.assign(new EventEmitter(), {
     getExtension: (id: string) => extensions.get(id) ?? null,
     getAllExtensions: () => [...extensions.values()]
@@ -271,6 +271,16 @@ describe('context menus in the page menu', () => {
     expect(
       getBrowserExtensionProfileStateStore().read('default', VAULT).contextMenus[1].checked
     ).toBe(true)
+  })
+})
+
+describe('action.openPopup', () => {
+  it('treats empty options like omitted options and still checks windowId', async () => {
+    await expect(call(VAULT, 'action', 'openPopup', [], 'page')).rejects.toThrow('No active tab')
+    await expect(call(VAULT, 'action', 'openPopup', [{}], 'page')).rejects.toThrow('No active tab')
+    await expect(call(VAULT, 'action', 'openPopup', [{ windowId: 'x' }], 'page')).rejects.toThrow(
+      'Invalid arguments at 0.windowId'
+    )
   })
 })
 

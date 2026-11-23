@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
-  BUNDLED_AGENT_STATE_RULE_FILES,
   parseAgentStateRuleFiles,
   RAW_BUNDLED_AGENT_STATE_RULE_FILES
 } from './agent-state-rules-catalog'
 
-describe('bundled agent state rule files', () => {
-  it('are used as bundled, without parsing, so parsing must not change them', () => {
-    expect(BUNDLED_AGENT_STATE_RULE_FILES).toBe(RAW_BUNDLED_AGENT_STATE_RULE_FILES)
-    expect(parseAgentStateRuleFiles(RAW_BUNDLED_AGENT_STATE_RULE_FILES)).toStrictEqual(
-      RAW_BUNDLED_AGENT_STATE_RULE_FILES
-    )
+describe('the bundled agent state rules', () => {
+  // Why: the bundle loads them unchecked, but a live update of the same files is parsed and refused whole.
+  it('parse as a live update would', () => {
+    expect(() => parseAgentStateRuleFiles(RAW_BUNDLED_AGENT_STATE_RULE_FILES)).not.toThrow()
   })
 })

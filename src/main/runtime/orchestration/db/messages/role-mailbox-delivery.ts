@@ -1,3 +1,9 @@
+import {
+  finalizeMailboxDelivery,
+  markDeliveryAcknowledged,
+  requireDeliveryRaw
+} from './mailbox-delivery-finalization'
+export { finalizeMailboxDelivery } from './mailbox-delivery-finalization'
 import type { DeliveryRow, MessageRow, MessageType } from '../orchestration-records'
 import { OrchestrationError } from '../../orchestration-error'
 import { generateId } from '../generated-id'
@@ -5,9 +11,11 @@ import type { OrchestrationDb } from '../orchestration-db'
 import { exposeDeliveryTimestamps, exposeMessageListTimestamps } from '../utc-timestamp'
 import { requireMailboxConsumer } from './mailbox-consumer'
 import { ORCHESTRATION_DELIVERY_BATCH_LIMIT } from './mailbox-routing-page'
+import type { ReportFollowUpAction } from '../../../../../shared/orchestration/mailbox/orchestration-report-follow-up'
 import { DELIVERY_COLUMN_LIST } from '../row-column-lists'
+import type { MailTaker } from './mail-taker'
 
-// Repeats the outstanding index's predicate so lookups use it; '' marks pre-mailbox rows, never a mailbox.
+// Repeats the outstanding index predicate; empty handles predate mailboxes.
 const OUTSTANDING_IN_MAILBOX = "mailbox_handle = ? AND mailbox_handle != ''"
 
 export function getDeliveryRaw(this: OrchestrationDb, id: string): DeliveryRow | undefined {
@@ -31,7 +39,7 @@ export function getDeliveryMessages(this: OrchestrationDb, delivery: DeliveryRow
   )
 }
 
-type MailboxDeliveryParams = {
+export type MailboxDeliveryParams = {
   runId: string
   mailboxHandle: string
   consumerGeneration: number
@@ -44,6 +52,21 @@ export type MailboxDeliveryBatch = {
   delivery: DeliveryRow
   messages: MessageRow[]
   replayed: boolean
+  finalResponse?: {
+    runId: string
+    dispatchId?: string
+    deliveryId: string | null
+    messages: (object & { follow_up?: ReportFollowUpAction })[]
+    count: number
+    replayed: boolean
+    deliveryAcknowledged?: boolean
+    acknowledged: string | null
+    timedOut: boolean
+    cancelled: boolean
+    connectionLost: boolean
+    formatted?: string
+    next?: string
+  }
 }
 
 export function getOrCreateMailboxDelivery(
@@ -65,7 +88,11 @@ export function getOrCreateMailboxDelivery(
 // A consuming read hands over its batch and records the caller's receipt in the same commit.
 export function takeMailboxDelivery(
   this: OrchestrationDb,
-  params: MailboxDeliveryParams & { recordTaken?: (batch: MailboxDeliveryBatch) => void }
+  params: MailboxDeliveryParams & {
+    recordTaken?: (batch: MailboxDeliveryBatch) => void
+    /** Who this read hands its questions to. */
+    taker: MailTaker
+  }
 ): MailboxDeliveryBatch | undefined {
   this.db.exec('BEGIN IMMEDIATE')
   try {
@@ -73,7 +100,9 @@ export function takeMailboxDelivery(
     const selected = selectMailboxDelivery(this, params)
     const batch = selected && {
       ...selected,
-      delivery: exposeDeliveryTimestamps(markDeliveryAcknowledged(this, selected.delivery))
+      delivery: exposeDeliveryTimestamps(
+        markDeliveryAcknowledged(this, selected.delivery, params.taker)
+      )
     }
     if (batch) {
       params.recordTaken?.(batch)
@@ -161,6 +190,8 @@ export function acknowledgeMailboxDelivery(
     consumerGeneration: number
     consumerSource?: 'dispatch' | 'attachment'
     deliveryId: string
+    /** Who this acknowledgement hands its questions to. */
+    taker: MailTaker
   }
 ): { delivery: DeliveryRow; duplicate: boolean } {
   this.db.exec('BEGIN IMMEDIATE')
@@ -187,7 +218,7 @@ export function acknowledgeMailboxDelivery(
       this.db.exec('COMMIT')
       return { delivery: exposeDeliveryTimestamps(delivery), duplicate: true }
     }
-    const acknowledged = markDeliveryAcknowledged(this, delivery)
+    const acknowledged = markDeliveryAcknowledged(this, delivery, params.taker)
     this.db.exec('COMMIT')
     return { delivery: exposeDeliveryTimestamps(acknowledged), duplicate: false }
   } catch (error) {
@@ -203,35 +234,6 @@ export function staleDelivery(db: OrchestrationDb, deliveryId: string): Orchestr
       ? `${deliveryId} is a message id, not a delivery id. Acknowledge the batch with the deliveryId field from the check response; process the entire batch before acknowledging.`
       : `Delivery ${deliveryId} does not belong to this mailbox. --ack requires a delivery_* ID returned by orchestration check; process the entire batch before acknowledging.`
   )
-}
-
-function markDeliveryAcknowledged(db: OrchestrationDb, delivery: DeliveryRow): DeliveryRow {
-  const messageIds = JSON.parse(delivery.message_ids) as string[]
-  if (messageIds.length > 0) {
-    const placeholders = messageIds.map(() => '?').join(',')
-    db.db
-      .prepare(
-        `UPDATE messages
-         SET read = 1, pointer_enter_pending = 0, pointer_pty_id = NULL,
-             pointer_process_incarnation = NULL
-         WHERE id IN (${placeholders})`
-      )
-      .run(...messageIds)
-  }
-  db.db
-    .prepare(
-      "UPDATE deliveries SET status = 'acknowledged', acknowledged_at = datetime('now') WHERE id = ?"
-    )
-    .run(delivery.id)
-  return requireDeliveryRaw(db, delivery.id)
-}
-
-function requireDeliveryRaw(db: OrchestrationDb, id: string): DeliveryRow {
-  const delivery = db.getDeliveryRaw(id)
-  if (!delivery) {
-    throw new Error(`Delivery ${id} disappeared inside its transaction.`)
-  }
-  return delivery
 }
 
 export function hasOutstandingMailboxDelivery(
@@ -275,6 +277,7 @@ export function fenceUnacknowledgedMailboxDeliveries(
 }
 
 export type RoleMailboxDeliveryMethods = {
+  finalizeMailboxDelivery: typeof finalizeMailboxDelivery
   getDeliveryRaw: typeof getDeliveryRaw
   getDeliveryMessages: typeof getDeliveryMessages
   getOrCreateMailboxDelivery: typeof getOrCreateMailboxDelivery
@@ -287,6 +290,7 @@ export type RoleMailboxDeliveryMethods = {
 
 export function attachRoleMailboxDelivery(ctor: { prototype: object }): void {
   Object.assign(ctor.prototype, {
+    finalizeMailboxDelivery,
     getDeliveryRaw,
     getDeliveryMessages,
     getOrCreateMailboxDelivery,

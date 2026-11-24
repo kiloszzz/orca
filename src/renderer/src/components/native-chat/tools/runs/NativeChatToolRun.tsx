@@ -162,7 +162,7 @@ export function NativeChatToolRun({
   }
 
   return (
-    <div className={spacing}>
+    <div className={cn(spacing, showsHeader && 'border-l-[1.5px] border-chat-code-border pl-2.5')}>
       {standaloneRows}
       {hasAskCall ? (
         <NativeChatAwaitingInputRow

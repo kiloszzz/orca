@@ -123,7 +123,7 @@ export function nativeChatTurnDiffs(
   )
 }
 
-export const NATIVE_CHAT_TURN_DIFF_FILE_LIMIT = 20
+export const NATIVE_CHAT_TURN_DIFF_FILE_LIMIT = 3
 
 /** Compare recorded inputs so unrelated streaming turns do not repaint existing outcome cards. */
 export function sameNativeChatTurnDiff(

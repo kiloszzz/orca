@@ -51,6 +51,10 @@ export function NativeChatTranscriptViewport({
             {children}
           </div>
           {overlays}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-gradient-to-t from-chat-canvas to-transparent"
+          />
           <NativeChatJumpToLatest visible={showJump} onJump={onJump} />
         </div>
       </NativeChatForwardedGestureContext.Provider>

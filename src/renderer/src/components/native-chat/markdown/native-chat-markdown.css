@@ -3,7 +3,7 @@
    replies, the bubble's color in user messages); a theme may still color bold. :where keeps this
    below the link-label rule, so bold link text takes the link color. */
 .native-chat-markdown :where(strong) {
-  color: var(--chat-bold-foreground, currentColor);
+  color: var(--chat-bold-foreground, var(--chat-foreground-strong));
 }
 
 /* Match chat headings' semibold; inherited `bolder` resolved to 700 and outweighed them. */
@@ -13,19 +13,42 @@
 
 .native-chat-markdown h1 {
   font-size: 1.2857142857em;
+  color: var(--chat-foreground-strong);
 }
 
 .native-chat-markdown h2 {
-  font-size: 1.1428571429em;
+  font-size: 1.16em;
+  color: var(--chat-foreground-strong);
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--chat-code-border);
 }
 
 .native-chat-markdown h3 {
   font-size: 1.0714285714em;
+  color: var(--chat-foreground-strong);
 }
 
 /* A step under body text; em follows Text size the way headings do. */
 .native-chat-markdown table {
   font-size: 0.9285714286em;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--chat-code-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.native-chat-markdown thead th {
+  background: var(--chat-code-surface);
+  color: var(--chat-foreground-strong);
+}
+
+.native-chat-markdown tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--chat-source-foreground) 2%, transparent);
+}
+
+.native-chat-markdown tbody tr:hover {
+  background: color-mix(in srgb, var(--chat-source-foreground) 4.5%, transparent);
 }
 
 .native-chat-markdown a {

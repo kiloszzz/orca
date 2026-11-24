@@ -71,27 +71,50 @@ export function NativeChatTurnDiffRollup({
   diff: NativeChatTurnDiff
 }): React.JSX.Element {
   const t = useTranslate()
+  const firstMessageId = diff.files[0]?.edits[0]?.target.messageId
+  const { open: cardOpen, setOpen: setCardOpen } = useNativeChatDisclosure(
+    `turn-diff-card-open:${firstMessageId}`,
+    true
+  )
   const { open: showAll, setOpen: setShowAll } = useNativeChatDisclosure(
-    `turn-diff-files:${diff.files[0]?.edits[0]?.target.messageId}`,
+    `turn-diff-files:${firstMessageId}`,
     false
   )
+  const hasOverflow = diff.files.length > NATIVE_CHAT_TURN_DIFF_FILE_LIMIT
   const files = showAll ? diff.files : diff.files.slice(0, NATIVE_CHAT_TURN_DIFF_FILE_LIMIT)
   const remaining = diff.files.length - files.length
   return (
     <div
       className={`${NATIVE_CHAT_HIDEABLE_CARD_CLASS} rounded-lg border border-chat-code-border p-2 text-xs text-chat-foreground-faint`}
     >
-      <div className="flex min-w-0 items-center gap-1.5 px-1 pb-1">
-        <span className="min-w-0 truncate">
-          {t('components.native-chat.turnDiff.changedFiles', '{{count}} changed files', {
-            count: diff.files.length,
-            defaultValue_one: '{{count}} changed file'
-          })}
-        </span>
-        <DiffLineCounts added={diff.added} removed={diff.removed} />
-        {diff.truncated ? (
-          <span>{t('components.native-chat.turnDiff.partial', 'Partial diff')}</span>
-        ) : null}
+      <div className="flex min-w-0 items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          aria-expanded={cardOpen}
+          className="min-w-0 flex-1 justify-start"
+          onClick={() => setCardOpen(!cardOpen)}
+        >
+          <ChevronRight
+            aria-hidden
+            className={
+              cardOpen
+                ? 'size-3.5 shrink-0 rotate-90 transition-transform'
+                : 'size-3.5 shrink-0 transition-transform'
+            }
+          />
+          <span className="min-w-0 truncate text-chat-foreground">
+            {t('components.native-chat.turnDiff.changedFiles', '{{count}} changed files', {
+              count: diff.files.length,
+              defaultValue_one: '{{count}} changed file'
+            })}
+          </span>
+          <DiffLineCounts added={diff.added} removed={diff.removed} />
+          {diff.truncated ? (
+            <span>{t('components.native-chat.turnDiff.partial', 'Partial diff')}</span>
+          ) : null}
+        </Button>
         <NativeChatCardHideButton
           updates={{ nativeChatTurnDiffSummary: false }}
           settingSectionId={NATIVE_CHAT_TURN_DIFF_SETTING_SECTION_ID}
@@ -101,18 +124,36 @@ export function NativeChatTurnDiffRollup({
           )}
         />
       </div>
-      <div className="space-y-1">
-        {files.map((file) => (
-          <TurnDiffFileRow key={file.path} file={file} />
-        ))}
-        {remaining > 0 ? (
-          <Button variant="ghost" size="xs" onClick={() => setShowAll(true)}>
-            {t('components.native-chat.turnDiff.showMoreFiles', 'Show {{count}} more', {
-              count: remaining
-            })}
-          </Button>
-        ) : null}
-      </div>
+      <NativeChatExpandable open={cardOpen}>
+        <div className="mt-1 space-y-1">
+          {files.map((file) => (
+            <TurnDiffFileRow key={file.path} file={file} />
+          ))}
+          {hasOverflow ? (
+            <div className="flex items-center gap-1 pt-0.5">
+              <Button variant="ghost" size="xs" onClick={() => setShowAll(!showAll)}>
+                {showAll
+                  ? t('components.native-chat.userMessage.showLess', 'Show less')
+                  : t('components.native-chat.turnDiff.showMoreFiles', 'Show {{count}} more', {
+                      count: remaining
+                    })}
+              </Button>
+              {showAll ? (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    setShowAll(false)
+                    setCardOpen(false)
+                  }}
+                >
+                  {t('components.native-chat.prompt.collapse', 'Collapse')}
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </NativeChatExpandable>
     </div>
   )
 }

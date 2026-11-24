@@ -10,18 +10,22 @@ export type NativeChatContextUsageSummary = {
   rows: readonly { name: string; tokens: number; percentage: number; deferred?: true }[]
 }
 
+/** Warning amber threshold before context nears exhaustion. */
+const WARNING_PERCENTAGE = 65
 /** Past this the window is nearly spent, so the ring turns red to say so. */
-const CRITICAL_PERCENTAGE = 90
+const CRITICAL_PERCENTAGE = 85
 
-/** What a ring draws: its fill clamped to 0-100, the red state, and the token counts as shown. */
+/** What a ring draws: its fill clamped to 0-100, warning/red states, and the token counts as shown. */
 export function contextUsageRingReadout(usage: NativeChatContextUsageSummary): {
   filled: number
+  warning: boolean
   critical: boolean
   used: string
   window: string
 } {
   return {
     filled: Math.min(Math.max(usage.percentage, 0), 100),
+    warning: usage.percentage >= WARNING_PERCENTAGE && usage.percentage < CRITICAL_PERCENTAGE,
     critical: usage.percentage >= CRITICAL_PERCENTAGE,
     used: formatContextTokenCount(usage.usedTokens),
     window: formatContextTokenCount(usage.windowTokens)

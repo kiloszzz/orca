@@ -99,7 +99,7 @@ export function NativeChatContextUsageRing({
   usage: NativeChatContextUsageSummary
 }): React.JSX.Element {
   const t = useTranslate()
-  const { filled, critical, used, window } = contextUsageRingReadout(usage)
+  const { filled, warning, critical, used, window } = contextUsageRingReadout(usage)
   const label = t(
     'components.native-chat.contextUsage.label',
     'Context {{used}} of {{window}} tokens, {{percent}}% used',
@@ -134,7 +134,8 @@ export function NativeChatContextUsageRing({
             data-native-chat-context-usage={usage.percentage}
             data-native-chat-context-usage-estimated={usage.estimated ? 'true' : undefined}
             className={cn(
-              'flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:size-11',
+              'flex h-7 items-center justify-center gap-1.5 rounded-md px-1.5 text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:h-11 pointer-coarse:px-2.5',
+              warning && 'text-chat-warning',
               critical && 'text-destructive'
             )}
             // A read-only readout: clicking it must not pull focus out of the composer.
@@ -150,7 +151,7 @@ export function NativeChatContextUsageRing({
               height={RING_SIZE}
               viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`}
               aria-hidden="true"
-              className="-rotate-90"
+              className="shrink-0 -rotate-90"
             >
               <circle
                 cx={RING_SIZE / 2}
@@ -173,6 +174,9 @@ export function NativeChatContextUsageRing({
                 strokeDashoffset={RING_CIRCUMFERENCE * (1 - filled / 100)}
               />
             </svg>
+            <span aria-hidden="true" className="text-xs whitespace-nowrap tabular-nums">
+              {`${usage.percentage}% · ${used}`}
+            </span>
           </button>
         </PopoverTrigger>
         <PopoverContent

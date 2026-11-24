@@ -52,6 +52,11 @@ export function NativeChatTranscriptItems({
           }
           const previousEnd = window.virtualItems[position - 1]?.end ?? window.scrollMargin
           const leavesWhole = nativeChatSlotLeavesWhole(slot)
+          const startsUserTurn =
+            item.index > 0 &&
+            slot.kind === 'message' &&
+            slot.message.role === 'user' &&
+            !slot.message.from
           return (
             <Fragment key={item.key}>
               <div aria-hidden style={{ height: Math.max(0, item.start - previousEnd) }} />
@@ -59,7 +64,13 @@ export function NativeChatTranscriptItems({
               <div
                 data-index={item.index}
                 ref={window.measureRow}
-                className={leavesWhole ? 'w-full' : 'flow-root w-full'}
+                className={
+                  leavesWhole
+                    ? 'w-full'
+                    : startsUserTurn
+                      ? 'flow-root w-full border-t border-chat-code-border pt-4'
+                      : 'flow-root w-full'
+                }
               >
                 <NativeChatTranscriptRow
                   slot={slot}

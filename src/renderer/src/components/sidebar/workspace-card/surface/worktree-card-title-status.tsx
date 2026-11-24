@@ -85,14 +85,21 @@ export function WorktreeCardTitleStatusProvider({
   const pickingSendTarget = useAppStore(
     (s) => selectSendTargetControlInputs(s, worktree.id).targetMode !== null
   )
-  const { compactRootListExpanded } = useWorktreeAgentExpansionState(worktree.id, worktree.hostId)
+  const { compactRootListExpanded, agentsCollapsed } = useWorktreeAgentExpansionState(
+    worktree.id,
+    worktree.hostId
+  )
   // Compact mode folds two or more agents behind a summary row until it is expanded.
   const foldedBehindSummary =
     card.agentActivityDisplayMode === 'compact' &&
     signals.rootCount > 1 &&
     !compactRootListExpanded &&
     !pickingSendTarget
-  const linesShown = showInlineAgentList && signals.rootCount > 0 && !foldedBehindSummary
+  const linesShown =
+    showInlineAgentList &&
+    signals.rootCount > 0 &&
+    !foldedBehindSummary &&
+    !(agentsCollapsed && !pickingSendTarget)
   const descendants = lineageDescendantIdentities ?? NO_DESCENDANTS
   const hiddenDescendants = lineageCollapsed ? descendants : NO_DESCENDANTS
   const lineage = useLineageSlotSummary(descendants, lineageCollapsed)

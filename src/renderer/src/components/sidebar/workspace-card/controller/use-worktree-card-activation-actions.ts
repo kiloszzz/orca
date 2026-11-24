@@ -13,6 +13,8 @@ import {
 import type { WorktreeCardProps } from './worktree-card-model'
 import type { useWorktreeCardFoundation } from './use-worktree-card-foundation'
 import type { useWorktreeCardLinkedDetails } from '../details/use-worktree-card-linked-details'
+import { useAppStore } from '@/store'
+import { selectWorkspaceShowsUnread } from '../slots/worktree-card-slot-rollup'
 
 type Foundation = ReturnType<typeof useWorktreeCardFoundation>
 type LinkedDetails = ReturnType<typeof useWorktreeCardLinkedDetails>
@@ -202,9 +204,10 @@ export function useWorktreeCardActivationActions({
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.preventDefault()
       event.stopPropagation()
-      setWorkspaceUnreadByUser(worktree.id, !worktree.isUnread, worktree.hostId ?? 'local')
+      const showsUnread = selectWorkspaceShowsUnread(useAppStore.getState(), worktreeRef.current)
+      setWorkspaceUnreadByUser(worktree.id, !showsUnread, worktree.hostId ?? 'local')
     },
-    [worktree.hostId, worktree.id, worktree.isUnread, setWorkspaceUnreadByUser]
+    [worktree.hostId, worktree.id, setWorkspaceUnreadByUser]
   )
 
   return {

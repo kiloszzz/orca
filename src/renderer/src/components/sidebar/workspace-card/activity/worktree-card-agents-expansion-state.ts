@@ -10,19 +10,71 @@ export type WorktreeAgentExpansionState = {
   expandedLineageParents: ReadonlySet<string>
   expandedIdleChildGroups: ReadonlySet<string>
   compactRootListExpanded: boolean
+  agentsCollapsed?: boolean
 }
 
 const EMPTY_PANE_KEYS: ReadonlySet<string> = new Set()
+const COLLAPSED_AGENTS_STORAGE_KEY = 'orca:sidebar:collapsed-worktree-agents:v1'
 
 const DEFAULT_EXPANSION_STATE: WorktreeAgentExpansionState = {
   expandedLineageParents: EMPTY_PANE_KEYS,
   expandedIdleChildGroups: EMPTY_PANE_KEYS,
-  compactRootListExpanded: false
+  compactRootListExpanded: false,
+  agentsCollapsed: false
 }
 
 // Retain disclosures across virtualizer/lineage remounts in a bounded renderer-session cache; reload resets them.
 export const MAX_PERSISTED_WORKTREE_AGENT_EXPANSIONS = 512
 const expansionByKey = new Map<HostScopedWorktreeKey, WorktreeAgentExpansionState>()
+let collapsedKeysHydrated = false
+
+function readPersistedCollapsedKeys(): HostScopedWorktreeKey[] {
+  if (typeof window === 'undefined') {
+    return []
+  }
+  try {
+    const raw = window.localStorage.getItem(COLLAPSED_AGENTS_STORAGE_KEY)
+    if (!raw) {
+      return []
+    }
+    const parsed: unknown = JSON.parse(raw)
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is HostScopedWorktreeKey => typeof entry === 'string')
+      : []
+  } catch {
+    return []
+  }
+}
+
+function writePersistedCollapsedKeys(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+  try {
+    const collapsed = [...expansionByKey.entries()]
+      .filter(([, state]) => state.agentsCollapsed === true)
+      .map(([key]) => key)
+    if (collapsed.length === 0) {
+      window.localStorage.removeItem(COLLAPSED_AGENTS_STORAGE_KEY)
+    } else {
+      window.localStorage.setItem(COLLAPSED_AGENTS_STORAGE_KEY, JSON.stringify(collapsed))
+    }
+  } catch {
+    // Ignore storage quota or restricted environments.
+  }
+}
+
+function ensureCollapsedKeysHydrated(): void {
+  if (collapsedKeysHydrated) {
+    return
+  }
+  collapsedKeysHydrated = true
+  for (const key of readPersistedCollapsedKeys()) {
+    if (!expansionByKey.has(key)) {
+      expansionByKey.set(key, { ...DEFAULT_EXPANSION_STATE, agentsCollapsed: true })
+    }
+  }
+}
 
 /**
  * Local and remote copies of a workspace share its id, so disclosure is keyed per host. Unstamped
@@ -47,6 +99,7 @@ function trimPersistedExpansions(): void {
 }
 
 function readExpansionState(key: HostScopedWorktreeKey): WorktreeAgentExpansionState {
+  ensureCollapsedKeysHydrated()
   return expansionByKey.get(key) ?? DEFAULT_EXPANSION_STATE
 }
 
@@ -54,15 +107,22 @@ function persistExpansionState(
   key: HostScopedWorktreeKey,
   state: WorktreeAgentExpansionState
 ): void {
+  ensureCollapsedKeysHydrated()
+  const wasCollapsed = expansionByKey.get(key)?.agentsCollapsed === true
+  const isCollapsed = state.agentsCollapsed === true
   // Refresh LRU order and retain only non-default disclosures.
   expansionByKey.delete(key)
   if (
+    isCollapsed ||
     state.compactRootListExpanded ||
     state.expandedLineageParents.size > 0 ||
     state.expandedIdleChildGroups.size > 0
   ) {
-    expansionByKey.set(key, state)
+    expansionByKey.set(key, { ...state, agentsCollapsed: isCollapsed })
     trimPersistedExpansions()
+  }
+  if (wasCollapsed !== isCollapsed) {
+    writePersistedCollapsedKeys()
   }
 }
 
@@ -75,10 +135,10 @@ export function expandWorktreeAgentList(
 ): void {
   const key = expansionKey(worktreeId, executionHostId)
   const base = readExpansionState(key)
-  if (base.compactRootListExpanded) {
+  if (base.compactRootListExpanded && !base.agentsCollapsed) {
     return
   }
-  persistExpansionState(key, { ...base, compactRootListExpanded: true })
+  persistExpansionState(key, { ...base, compactRootListExpanded: true, agentsCollapsed: false })
   notifyExpansion(key)
 }
 
@@ -115,9 +175,11 @@ export type WorktreeAgentExpansionControls = {
   expandedLineageParents: ReadonlySet<string>
   expandedIdleChildGroups: ReadonlySet<string>
   compactRootListExpanded: boolean
+  agentsCollapsed: boolean
   toggleLineageParent: (paneKey: string) => void
   toggleIdleChildGroup: (parentPaneKey: string) => void
   toggleCompactRootList: () => void
+  toggleAgentsCollapsed: () => void
 }
 
 /** Restore each worktree’s disclosures across virtualizer and sibling-lineage remounts. */
@@ -162,18 +224,33 @@ export function useWorktreeAgentExpansionState(
     commit({ ...base, compactRootListExpanded: !base.compactRootListExpanded })
   }, [commit, key])
 
+  const toggleAgentsCollapsed = useCallback(() => {
+    const base = readExpansionState(key)
+    commit({ ...base, agentsCollapsed: !base.agentsCollapsed })
+  }, [commit, key])
+
   return {
     expandedLineageParents: current.expandedLineageParents,
     expandedIdleChildGroups: current.expandedIdleChildGroups,
     compactRootListExpanded: current.compactRootListExpanded,
+    agentsCollapsed: current.agentsCollapsed === true,
     toggleLineageParent,
     toggleIdleChildGroup,
-    toggleCompactRootList
+    toggleCompactRootList,
+    toggleAgentsCollapsed
   }
 }
 
 export function clearWorktreeAgentExpansionStateForTests(): void {
   expansionByKey.clear()
+  collapsedKeysHydrated = false
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.removeItem(COLLAPSED_AGENTS_STORAGE_KEY)
+    } catch {
+      // Ignore storage errors in tests.
+    }
+  }
 }
 
 export function seedWorktreeAgentExpansionStateForTests(

@@ -2,6 +2,7 @@ import React from 'react'
 import { LinearAgentSkillSetupPrompt } from '../../../skills/setup/LinearAgentSkillSetupPrompt'
 import type { WorktreeCardController } from '../controller/use-worktree-card-controller'
 import WorktreeCardAgents from '../activity/WorktreeCardAgents'
+import { WorktreeCardAgentsCollapseToggle } from '../activity/WorktreeCardAgentsCollapseToggle'
 import { WorktreeCardLineAgents } from '../activity/worktree-card-line-agents'
 import { WorktreeCardLineAgentMore } from '../activity/worktree-card-line-agent-more'
 import {
@@ -58,6 +59,12 @@ export const CARD_ACTIVITY_PARTS = {
       executionHostId={card.worktree.hostId}
       // Why: counterbalance the card stack gap so agents right after the title read as one group.
       className={props.tight === true ? '-mt-1' : 'mt-0'}
+    />
+  )),
+  AgentsCollapseToggle: part([], (_props, _children, card) => (
+    <WorktreeCardAgentsCollapseToggle
+      worktreeId={card.worktree.id}
+      executionHostId={card.worktree.hostId}
     />
   )),
   LineAgents: part([], (_props, _children, card) => (

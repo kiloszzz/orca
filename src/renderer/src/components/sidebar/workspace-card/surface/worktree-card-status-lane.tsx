@@ -8,6 +8,7 @@ import {
   useWorktreeCardLineageLaneStatus,
   useWorktreeCardRolledUpUnread
 } from './worktree-card-title-status'
+import { useWorktreeAgentsSummary } from '../activity/use-worktree-agents-summary'
 
 /** The card's leading status lane: activity, review and the unread toggle or dot. */
 export function WorktreeCardStatusLane({
@@ -21,6 +22,7 @@ export function WorktreeCardStatusLane({
   // The dot also speaks for its agents and collapsed child workspaces.
   const rolledUpUnread = useWorktreeCardRolledUpUnread()
   const lineageStatus = useWorktreeCardLineageLaneStatus()
+  const { unreadDoneCount } = useWorktreeAgentsSummary(card.worktree.id, card.worktree.hostId)
   return (
     <div
       className={cn(
@@ -34,7 +36,7 @@ export function WorktreeCardStatusLane({
         worktreeId={card.worktree.id}
         showStatus={card.showStatus}
         showUnreadAction={showUnreadAction}
-        isUnread={card.worktree.isUnread || rolledUpUnread}
+        isUnread={card.worktree.isUnread || rolledUpUnread || unreadDoneCount > 0}
         lineageStatus={lineageStatus}
         unreadTooltip={card.unreadTooltip}
         onPointerDown={card.stopQuickActionPointerPropagation}

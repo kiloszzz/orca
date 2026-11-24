@@ -221,10 +221,10 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
     presentation.progress,
     stateDotTooltipLabel(agent, dotState, now)
   )
-  const dotTooltipLabel =
-    isUnvisited && dotState === 'done'
-      ? t('workspace.activity.unreadLabel', '{{status}} · Unread', { status: dotStatusLabel })
-      : dotStatusLabel
+  const isUnreadDone = isUnvisited && dotState === 'done'
+  const dotTooltipLabel = isUnreadDone
+    ? t('workspace.activity.unreadLabel', '{{status}} · Unread', { status: dotStatusLabel })
+    : dotStatusLabel
   // Unverifiable rows expose elapsed silence in their timestamp slot; do not hide their only content in a tooltip.
   const noUpdateLabel = dotState === 'unverifiable' ? rowNoUpdateLabel(agent, now) : null
 
@@ -266,6 +266,7 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
         sendTargetStatus === 'disabled' && 'cursor-default opacity-60'
       )}
       data-focused-agent-pane={highlighted ? 'true' : undefined}
+      data-agent-row-unread={isUnreadDone ? 'true' : undefined}
       data-current={view?.current ? 'true' : undefined}
       aria-current={view?.current ? 'true' : undefined}
       aria-description={
@@ -338,9 +339,9 @@ const DashboardAgentRow = React.memo(function DashboardAgentRow({
             'block min-w-0 flex-1 overflow-hidden text-[11px] leading-snug',
             'transition-[height] duration-200 ease-out [interpolate-size:allow-keywords]',
             expanded ? 'h-auto whitespace-pre-wrap break-words' : 'h-[1lh] truncate',
-            isUnvisited ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground',
+            isUnreadDone ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground',
             // Why: the selected-row fill washes out muted text — keep it readable.
-            highlighted && !isUnvisited && 'text-foreground/90'
+            highlighted && !isUnreadDone && 'text-foreground/90'
           )}
           title={displayLabel}
         >

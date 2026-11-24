@@ -124,6 +124,7 @@
                 }
               ]
             },
+            { "el": "AgentsCollapseToggle", "when": "vars.inlineAgents" },
             {
               "el": "Row",
               "when": "vars.headerActions",

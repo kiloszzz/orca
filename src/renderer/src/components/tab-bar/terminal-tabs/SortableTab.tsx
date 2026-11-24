@@ -33,6 +33,7 @@ import {
   isTerminalTabActivityLive,
   terminalTabHasUnreadActivity
 } from './terminal-tab-activity-status'
+import { hasUnacknowledgedDoneAgentForTab } from './terminal-tab-agent-unread'
 import { useTerminalTabActivity } from './use-terminal-tab-activity'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/overlay-interaction/close-all-context-menus'
 
@@ -100,7 +101,12 @@ export default function SortableTab({
         completionTabId: statusTabId,
         unreadTerminalTabs: s.unreadTerminalTabs,
         unreadAgentCompletionPanes: s.unreadAgentCompletionPanes
-      })
+      }) ||
+      hasUnacknowledgedDoneAgentForTab(
+        s.agentStatusByPaneKey,
+        s.acknowledgedAgentsByPaneKey,
+        statusTabId
+      )
   )
   const { activityStatus, programProgress } = useTerminalTabActivity({
     id: statusTabId,
@@ -236,7 +242,7 @@ export default function SortableTab({
       {isBotHome && <BotHomeTabAccent />}
       {showUnreadActivity && (
         // Why: a real DOM child keeps both drop-indicator pseudo-elements free and pointer events reaching the tab.
-        <span aria-hidden className="pointer-events-none absolute inset-0 bg-amber-500/10" />
+        <span aria-hidden className="pointer-events-none absolute inset-0 bg-agent-unread/15" />
       )}
       <TerminalTabLeadingIcon
         agent={tabAgent}
@@ -374,6 +380,9 @@ export default function SortableTab({
         sessionSwitchOpening={openingId}
         onSessionSwitchComplete={onComplete}
         tab={tab}
+        statusTabId={statusTabId}
+        isUnread={showUnreadActivity}
+        activityStatus={activityStatus}
         unifiedTabId={unifiedTabId}
         groupId={groupId}
         isActive={isActive}

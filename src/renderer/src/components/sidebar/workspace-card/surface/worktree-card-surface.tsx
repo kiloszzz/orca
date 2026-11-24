@@ -10,6 +10,7 @@ import type { WorktreeCardController } from '../controller/use-worktree-card-con
 import { DEFAULT_WORKSPACE_CARD_TEMPLATE } from '../template/default-workspace-card'
 import { renderWorkspaceCardTemplate } from '../template/render-workspace-card-template'
 import { WorktreeCardTitleStatusProvider } from './worktree-card-title-status'
+import { useWorktreeAgentsSummary } from '../activity/use-worktree-agents-summary'
 
 /** Shape, inset and transitions every sidebar card row shares; inactive rows add `worktree-sidebar-card-hover`. */
 export const WORKTREE_CARD_SURFACE_CLASS_NAME =
@@ -50,6 +51,8 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
     contentIndent
   } = card
   const isSleeping = useIsSleepingWorktree(worktree.id)
+  const { unreadDoneCount } = useWorktreeAgentsSummary(worktree.id, worktree.hostId)
+  const hasCardUnread = card.showUnreadEmphasis || unreadDoneCount > 0
   const geometryFor = (statusLane: boolean) =>
     getWorktreeCardFrameGeometry({ flushSurface, contentIndent, statusLane })
   const { content: templateContent, frame } = renderWorkspaceCardTemplate(
@@ -94,6 +97,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
         isRuntimeDisconnected && !isDeleting && 'opacity-60'
       )}
       data-worktree-card-surface="true"
+      data-worktree-card-unread={hasCardUnread ? 'true' : undefined}
       data-worktree-card-active={
         isActiveSurface && !isLineageDropTarget ? activeSurfaceVariant : undefined
       }

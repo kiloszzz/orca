@@ -1,4 +1,5 @@
-import { CopyX, Pencil, Pin, PinOff, SquareTerminal, Timer, X } from 'lucide-react'
+import { Bell, BellOff, CopyX, Pencil, Pin, PinOff, SquareTerminal, Timer, X } from 'lucide-react'
+import { useShallow } from 'zustand/react/shallow'
 import {
   ContextMenuItem,
   ContextMenuSeparator,
@@ -16,6 +17,12 @@ import type { NativeChatTabSession } from '../session-actions/tab-session-histor
 import { CopyTabIdMenuItem } from '../pane-actions/CopyTabIdMenuItem'
 import { useAllowAutoClose } from './use-allow-auto-close'
 import { CloseSplitPaneMenuItem } from '../pane-actions/CloseSplitPaneMenuItem'
+import {
+  isTerminalTabActivityLive,
+  type TerminalTabActivityStatus
+} from './terminal-tab-activity-status'
+import { getTabAgentPaneKeys } from './terminal-tab-agent-unread'
+import { agentAttentionTurnAt } from '@/attention/agent-attention-acknowledgement'
 
 const TAB_COLORS = [
   {
@@ -80,8 +87,13 @@ const TAB_COLORS = [
   }
 ] as const
 
+const EMPTY_PANE_KEYS: string[] = []
+
 type SortableTabContextMenuProps = {
   tab: Pick<TerminalTab, 'id' | 'worktreeId' | 'color'>
+  statusTabId?: string
+  isUnread?: boolean
+  activityStatus?: TerminalTabActivityStatus
   unifiedTabId: string
   groupId: string
   isActive: boolean
@@ -118,6 +130,9 @@ type SortableTabContextMenuProps = {
 
 export function SortableTabContextMenu({
   tab,
+  statusTabId,
+  isUnread = false,
+  activityStatus,
   unifiedTabId,
   groupId,
   isActive,
@@ -161,6 +176,35 @@ export function SortableTabContextMenu({
     sessionId: nativeChat?.sessionId
   })
 
+  const resolvedStatusTabId = statusTabId ?? tab.id
+  const toggleableUnreadPaneKeys = useAppStore(
+    useShallow((state) => {
+      if (!open) {
+        return EMPTY_PANE_KEYS
+      }
+      const keys = getTabAgentPaneKeys(state.agentStatusByPaneKey, resolvedStatusTabId)
+      if (isUnread) {
+        return keys
+      }
+      if (activityStatus && isTerminalTabActivityLive(activityStatus)) {
+        return EMPTY_PANE_KEYS
+      }
+      return keys.filter((key) => {
+        const entry = state.agentStatusByPaneKey.get(key)
+        return entry !== undefined && entry.state === 'done' && agentAttentionTurnAt(entry) > 0
+      })
+    })
+  )
+  const showUnreadToggle = toggleableUnreadPaneKeys.length > 0
+  const handleToggleUnread = (): void => {
+    const store = useAppStore.getState()
+    if (isUnread) {
+      store.acknowledgeAgents(toggleableUnreadPaneKeys, undefined, 'explicit')
+    } else {
+      store.unacknowledgeAgents(toggleableUnreadPaneKeys)
+    }
+  }
+
   return (
     <ContextMenuContent
       animation="none"
@@ -199,6 +243,18 @@ export function SortableTabContextMenu({
         />
       ) : null}
       <ContextMenuSeparator />
+      {showUnreadToggle ? (
+        <ContextMenuItem onSelect={handleToggleUnread}>
+          {isUnread ? (
+            <BellOff className="size-3.5 shrink-0" />
+          ) : (
+            <Bell className="size-3.5 shrink-0" />
+          )}
+          {isUnread
+            ? t('auto.components.sidebar.WorktreeContextMenu.8dacff1fe0', 'Mark Read')
+            : t('auto.components.sidebar.WorktreeContextMenu.f50603c6b2', 'Mark Unread')}
+        </ContextMenuItem>
+      ) : null}
       {closable && (canPin || isPinned) ? (
         <ContextMenuItem onSelect={onTogglePin}>
           {isPinned ? (

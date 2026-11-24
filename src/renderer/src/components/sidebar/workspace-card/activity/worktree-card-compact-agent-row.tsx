@@ -213,10 +213,11 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
     </span>
   ) : null
 
+  const isUnreadDone = isUnvisited && dotState === 'done'
   // Focused fills wash out muted text; brighten the lead while preserving unread emphasis.
   const leadClassName = cn(
-    isUnvisited ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground/90',
-    highlighted && !isUnvisited && 'text-foreground'
+    isUnreadDone ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground/90',
+    highlighted && !isUnreadDone && 'text-foreground'
   )
 
   const rowBody = (
@@ -305,7 +306,8 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
     <div
       draggable={false}
       className={cn(
-        'compact-agent-row agent-disclosure-row group/compact-agent-row min-w-0 cursor-pointer rounded-sm px-1 text-[11px] leading-none',
+        'compact-agent-row agent-disclosure-row group/compact-agent-row min-w-0 cursor-pointer rounded-sm text-[11px] leading-none',
+        isUnreadDone ? 'pl-2 pr-1' : 'px-1',
         'text-muted-foreground worktree-agent-row-hover',
         hasChildDisclosure && 'worktree-agent-lineage-parent-row',
         isLineageChild && 'worktree-agent-lineage-child-row',
@@ -320,6 +322,7 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
       onPointerDown={(e) => e.stopPropagation()}
       onDragStart={(e) => e.stopPropagation()}
       data-focused-agent-pane={highlighted ? 'true' : undefined}
+      data-agent-row-unread={isUnreadDone ? 'true' : undefined}
       data-current={view?.current ? 'true' : undefined}
       aria-current={view?.current ? 'true' : undefined}
       aria-description={parentConversationDescription}

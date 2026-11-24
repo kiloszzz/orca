@@ -1,32 +1,23 @@
 import type { BranchContext } from './worktree-agent-branch-context'
 import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
-import { useShallow } from 'zustand/react/shallow'
-import { shallow } from 'zustand/shallow'
 import { useAppStore } from '@/store/index'
 import { agentAttentionTurnAt } from '@/attention/agent-attention-acknowledgement'
-import { useAppStoreWithHostStatuses } from '@/store/slices/runtime-status/views/use-runtime-status-view'
 import DashboardAgentRow from '@/components/dashboard/DashboardAgentRow'
 import { useNow } from '@/lib/window-activity/use-now'
-import { deriveRunningAgentSendTargets } from '@/lib/agent-session/messaging/running-agent-targets'
-import {
-  selectSendTargetControlInputs,
-  selectSendTargetInputs
-} from './worktree-card-send-target-inputs'
 import { useAgentPresentation, useWorktreeAgentRow } from './useWorktreeAgentRows'
 import { useHostRootKeys } from './use-worktree-agent-host-roots'
 import { KeyedSummary } from './worktree-card-agent-keyed-summary'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host/execution-host'
 import { useWorktreeAgentDisplay } from './use-worktree-agent-display'
 import { cn } from '@/lib/class-names'
-import { recomputeOn } from '@/lib/recompute-on'
 import { useFocusedAgentPaneKey } from './focused-agent-row-highlight'
 import { CompactAgentExpansion } from './worktree-card-compact-agents'
 import { CompactAgentRow } from './worktree-card-compact-agent-row'
 import { revealCompactAgentCard } from '../../worktree-list/navigation/worktree-sidebar-reveal'
 import { useWorktreeAgentExpansionState } from './worktree-card-agents-expansion-state'
+import { WorktreeAgentRowContextMenu } from './WorktreeAgentRowContextMenu'
+import { useWorktreeCardSendTargets } from './use-worktree-card-send-targets'
 import { useTranslate } from '@/i18n/use-translate'
-import { agentSendDisabledReasonLabel } from '@/lib/agent-session/messaging/agent-send-disabled-reason-label'
-import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import { useWorktreeAgentActivation } from './use-worktree-agent-activation'
 import { opensClaudeParentConversation } from '@/lib/agent-session/navigation/claude-agent-row-view'
 import { IdleChildAgentGroupRow } from './worktree-card-idle-child-agents'
@@ -69,48 +60,14 @@ function WorktreeCardAgentsBody({
   hostFiltered,
   className
 }: Props & { roots: readonly string[]; hostFiltered: boolean }) {
-  const t = useTranslate(),
-    languageRevision = useUiLanguageRevision()
+  const t = useTranslate()
   const display = useWorktreeAgentDisplay()
   const expansion = useWorktreeAgentExpansionState(worktreeId, executionHostId)
   const focusedPaneKey = useFocusedAgentPaneKey(worktreeId)
   const onActivate = useWorktreeAgentActivation(worktreeId, executionHostId)
   const onDismiss = useAppStore((s) => s.dropAgentStatus)
   const send = useAppStore((s) => s.sendPromptToSidebarAgentTarget)
-  const control = useAppStore(useShallow((s) => selectSendTargetControlInputs(s, worktreeId)))
-  const inputs = useAppStoreWithHostStatuses(
-    (s, statuses) => selectSendTargetInputs(s, statuses, worktreeId),
-    shallow
-  )
-  const targets = useMemo(
-    () =>
-      recomputeOn([languageRevision], () => {
-        if (!control.targetMode) {
-          return null
-        }
-        return new Map(
-          deriveRunningAgentSendTargets(inputs, worktreeId).map((target) => [
-            target.paneKey,
-            control.targetMode?.status === 'sending' &&
-            control.targetMode.sendingPaneKey === target.paneKey
-              ? {
-                  status: 'sending' as const,
-                  disabledReason: t(
-                    'auto.components.sidebar.WorktreeCardAgents.sendingTarget',
-                    'Sending...'
-                  )
-                }
-              : {
-                  status: target.status,
-                  ...(target.disabledReason
-                    ? { disabledReason: agentSendDisabledReasonLabel(target.disabledReason) }
-                    : {})
-                }
-          ])
-        )
-      }),
-    [control, inputs, worktreeId, t, languageRevision]
-  )
+  const targets = useWorktreeCardSendTargets(worktreeId)
   const onSend = useCallback(
     (key: string) => {
       void send(key)
@@ -150,7 +107,8 @@ function WorktreeCardAgentsBody({
     ]
   )
   const compact = display.agentActivityDisplayMode === 'compact',
-    summary = compact && roots.length > 1 && !targets
+    summary = compact && roots.length > 1 && !targets,
+    agentsCollapsed = expansion.agentsCollapsed && !targets
   const rootRef = useRef<HTMLDivElement | null>(null),
     previousExpanded = useRef(expansion.compactRootListExpanded)
   useLayoutEffect(() => {
@@ -164,44 +122,51 @@ function WorktreeCardAgentsBody({
     return undefined
   }, [compact, expansion.compactRootListExpanded])
   return (
-    <div
-      ref={rootRef}
-      className={cn(compact ? 'flex flex-col mt-1 gap-0.5' : 'flex flex-col mt-1', className)}
-      onClick={stopBubble}
-      onDoubleClick={stopBubble}
-      onMouseDown={stopBubble}
-      onPointerDown={stopBubble}
-      role="tree"
-      aria-label={t('auto.components.sidebar.WorktreeCardAgents.1b0a156717', 'Agents')}
-      data-compact-agent-list={compact || undefined}
-    >
-      {summary ? (
-        <div
-          className={cn(
-            'compact-agent-summary-panel',
-            expansion.compactRootListExpanded && 'compact-agent-summary-panel-expanded'
-          )}
-        >
-          <KeyedSummary
-            worktreeId={worktreeId}
-            roots={roots}
-            hostFiltered={hostFiltered}
-            expanded={expansion.compactRootListExpanded}
-            onToggle={expansion.toggleCompactRootList}
-          />
-          <CompactAgentExpansion expanded={expansion.compactRootListExpanded}>
-            <AgentBranches
-              keysToRender={roots}
-              context={context}
-              timerActive={expansion.compactRootListExpanded}
-              root
+    <CompactAgentExpansion expanded={!agentsCollapsed} contentClassName="pt-0 gap-0">
+      <div
+        ref={rootRef}
+        className={cn(compact ? 'flex flex-col mt-1 gap-0.5' : 'flex flex-col mt-1', className)}
+        onClick={stopBubble}
+        onDoubleClick={stopBubble}
+        onMouseDown={stopBubble}
+        onPointerDown={stopBubble}
+        role="tree"
+        aria-label={t('auto.components.sidebar.WorktreeCardAgents.1b0a156717', 'Agents')}
+        data-compact-agent-list={compact || undefined}
+      >
+        {summary ? (
+          <div
+            className={cn(
+              'compact-agent-summary-panel',
+              expansion.compactRootListExpanded && 'compact-agent-summary-panel-expanded'
+            )}
+          >
+            <KeyedSummary
+              worktreeId={worktreeId}
+              roots={roots}
+              hostFiltered={hostFiltered}
+              expanded={expansion.compactRootListExpanded}
+              onToggle={expansion.toggleCompactRootList}
             />
-          </CompactAgentExpansion>
-        </div>
-      ) : (
-        <AgentBranches keysToRender={roots} context={context} timerActive root />
-      )}
-    </div>
+            <CompactAgentExpansion expanded={expansion.compactRootListExpanded}>
+              <AgentBranches
+                keysToRender={roots}
+                context={context}
+                timerActive={!agentsCollapsed && expansion.compactRootListExpanded}
+                root
+              />
+            </CompactAgentExpansion>
+          </div>
+        ) : (
+          <AgentBranches
+            keysToRender={roots}
+            context={context}
+            timerActive={!agentsCollapsed}
+            root
+          />
+        )}
+      </div>
+    </CompactAgentExpansion>
   )
 }
 const AgentBranches = React.memo(function AgentBranches({
@@ -310,25 +275,35 @@ const AgentBranch = React.memo(function AgentBranch({
   )
   return (
     <div className={compact ? cn('min-w-0', root && 'ms-2') : undefined}>
-      {compact ? (
-        <CompactAgentRow
-          {...common}
-          parentConversationDescription={
-            opensClaudeParentConversation(row)
-              ? t('auto.lib.claudeAgentRowView.openParentConversation', 'Open parent conversation')
-              : undefined
-          }
-          cacheTimerActive={timerActive}
-        />
-      ) : (
-        <DashboardAgentRow
-          {...common}
-          onDismiss={context.onDismiss}
-          stateDotSize="sm"
-          hideExpand
-          hideLineageConnectors
-        />
-      )}
+      <WorktreeAgentRowContextMenu
+        paneKey={paneKey}
+        row={row}
+        acknowledgedAt={acknowledgedAt}
+        disabled={Boolean(context.targets)}
+      >
+        {compact ? (
+          <CompactAgentRow
+            {...common}
+            parentConversationDescription={
+              opensClaudeParentConversation(row)
+                ? t(
+                    'auto.lib.claudeAgentRowView.openParentConversation',
+                    'Open parent conversation'
+                  )
+                : undefined
+            }
+            cacheTimerActive={timerActive}
+          />
+        ) : (
+          <DashboardAgentRow
+            {...common}
+            onDismiss={context.onDismiss}
+            stateDotSize="sm"
+            hideExpand
+            hideLineageConnectors
+          />
+        )}
+      </WorktreeAgentRowContextMenu>
       {hasChildren ? (
         compact ? (
           <CompactAgentExpansion expanded={expanded}>

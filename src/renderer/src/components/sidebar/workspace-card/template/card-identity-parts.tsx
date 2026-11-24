@@ -28,6 +28,7 @@ import {
   useWorktreeCardRolledUpUnread,
   WorktreeCardTitleStatus
 } from '../surface/worktree-card-title-status'
+import { useWorktreeAgentsSummary } from '../activity/use-worktree-agents-summary'
 import { cardElement } from './card-template-compiler'
 
 type Card = WorktreeCardController
@@ -46,11 +47,12 @@ function CardTitle({
   const { affiliateListMode, worktree } = card
   // Bold and the unread dot are one signal: any unread the card speaks for, its own or a hidden one.
   const rolledUpUnread = useWorktreeCardRolledUpUnread()
+  const { unreadDoneCount } = useWorktreeAgentsSummary(worktree.id, worktree.hostId)
   return (
     <WorktreeTitleInlineRename
       displayName={card.visibleCardTitle}
       disabled={card.isDeleting || affiliateListMode}
-      showUnreadEmphasis={card.showUnreadEmphasis || rolledUpUnread}
+      showUnreadEmphasis={card.showUnreadEmphasis || rolledUpUnread || unreadDoneCount > 0}
       dimReadTitle={props.dimWhenRead === true && !card.isActiveSurface}
       className="text-[13px] leading-5"
       editingClassName="flex-1"

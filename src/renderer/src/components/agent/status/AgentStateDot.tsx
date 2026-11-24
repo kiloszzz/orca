@@ -140,13 +140,20 @@ export const AgentStateDot = React.memo(function AgentStateDot({
       </span>
     )
   } else if (state === 'done') {
-    // A check distinguishes reported completion from live/idle dots; sidebar StatusIndicator intentionally differs.
+    // Unread completions use a glowing amber dot to stand out from read emerald checks.
     indicator = (
       <span
         className={cn('inline-flex shrink-0 items-center justify-center', box, className)}
         aria-label={label}
       >
-        <CircleCheck className={cn('text-emerald-500', icon)} aria-hidden="true" />
+        {unread ? (
+          <span
+            className="block size-[7px] rounded-full bg-agent-unread shadow-[0_0_0_2.5px_color-mix(in_srgb,var(--agent-unread)_25%,transparent)]"
+            aria-hidden="true"
+          />
+        ) : (
+          <CircleCheck className={cn('text-emerald-500', icon)} aria-hidden="true" />
+        )}
       </span>
     )
   } else if (state === 'unverifiable' || state === 'unconfirmed') {

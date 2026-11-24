@@ -96,7 +96,7 @@ export function primaryAgentCatalogEntries(): AgentCatalogEntry[] {
     },
     {
       id: 'dsh-acp',
-      label: 'DeepSeek Harness ACP',
+      label: translate('auto.lib.agent.catalog.dsh_acp_label', 'DeepSeek Harness ACP'),
       cmd: 'dsh',
       searchAliases: ['deepseek', 'dsh', 'dsh-acp', 'deepseek harness'],
       homepageUrl: 'https://www.deepseek.com'

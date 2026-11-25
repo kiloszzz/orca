@@ -62,8 +62,9 @@ If changing code around `git`, `gh`, source-control, or review behavior read [`d
 # Local macOS Custom Build
 
 - Use `./scripts/build-local-mac.sh` (ad-hoc signed, fast offline build) instead of bare `pnpm run build:mac` when packaging a local macOS `Orca.app`.
+  - Includes custom `orcad-template` by default so Managed SSH remote hosts auto-update to custom server JS + `out/mobile-web/` (on first run per Mac, `scripts/ensure-orcad-prebuilds.mjs` fetches only the ~2-4 MB native slots via HTTP Range from the matching official release and caches them under `~/.cache/orca-custom/orcad-prebuilds/`; pass `--no-orcad` to skip or `--orcad-from <path>` to seed offline).
   - First build on a new machine (or after native/mobile/WSL changes): `./scripts/build-local-mac.sh` (add `--install` to copy into `/Applications/Orca.app` and link `orca` CLI; add `--uninstall-brew` if Homebrew cask `orca` is still installed — never use `--zap`).
-  - Incremental JS/TS rebuild: `./scripts/build-local-mac.sh --fast` (reuses already-built `out/relay/wsl`, `out/mobile-web`, and macOS Swift helpers; add `--install` when ready to replace `/Applications/Orca.app`).
+  - Incremental JS/TS rebuild: `./scripts/build-local-mac.sh --fast` (reuses already-built `out/relay/wsl`, `out/mobile-web`, and macOS Swift helpers; still refreshes `orcad-template`; add `--install` when ready to replace `/Applications/Orca.app`).
   - Pass `--dry-run` to preview steps without modifying files; pass `--typecheck` to run `pnpm run tc` before building.
   - Never kill a running `/Applications/Orca.app` if the user is chatting inside it; build to `dist/` first and let the user quit before installing.
 - On macOS, never run bare `git fetch upstream` (upstream has case-colliding branch names); fetch a specific ref such as `git fetch upstream main`.

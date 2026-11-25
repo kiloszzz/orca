@@ -8,6 +8,8 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 FAST=0
+WITH_ORCAD=1
+ORCAD_FROM=""
 FORCE_DEPS=0
 RUN_TYPECHECK=0
 INSTALL_APP=0
@@ -19,17 +21,19 @@ usage() {
   cat <<'EOF'
 Usage: ./scripts/build-local-mac.sh [options]
 
-Build a local macOS Orca.app (default: ad-hoc signed, no DMG, no network notarization).
+Build a local macOS Orca.app (default: ad-hoc signed, includes custom orcad-template for Managed SSH, no DMG, no network notarization).
 
 Options:
-  --fast             Incremental rebuild (reuse existing wsl-guest, mobile-web, and Swift helpers)
-  --deps             Force pnpm install for root and mobile/ before building
-  --typecheck        Run `pnpm run tc` before building
-  --install          Install built Orca.app to /Applications/Orca.app and link `orca` CLI
-  --uninstall-brew   With --install, automatically run `brew uninstall --cask orca` (keeps user data)
-  --sign <identity>  Codesign identity (default: "-" for ad-hoc; or env ORCA_LOCAL_SIGN_IDENTITY)
-  --dry-run          Print detected environment and planned commands without executing
-  -h, --help         Show this help message
+  --fast                 Incremental rebuild (reuse existing wsl-guest, mobile-web, and Swift helpers; still refreshes orcad-template)
+  --no-orcad             Skip packaging orcad-template (omits Managed SSH remote server auto-deploy)
+  --orcad-from <path>    Seed orcad native prebuilds from a local official Orca.app or orcad-template directory
+  --deps                 Force pnpm install for root and mobile/ before building
+  --typecheck            Run `pnpm run tc` before building
+  --install              Install built Orca.app to /Applications/Orca.app and link `orca` CLI
+  --uninstall-brew       With --install, automatically run `brew uninstall --cask orca` (keeps user data)
+  --sign <identity>      Codesign identity (default: "-" for ad-hoc; or env ORCA_LOCAL_SIGN_IDENTITY)
+  --dry-run              Print detected environment and planned commands without executing
+  -h, --help             Show this help message
 
 Examples:
   # First-time build & install on a new Mac:
@@ -45,6 +49,18 @@ while [[ $# -gt 0 ]]; do
     --fast)
       FAST=1
       shift
+      ;;
+    --no-orcad)
+      WITH_ORCAD=0
+      shift
+      ;;
+    --orcad-from)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: --orcad-from requires a path argument" >&2
+        exit 1
+      fi
+      ORCAD_FROM="$2"
+      shift 2
       ;;
     --deps)
       FORCE_DEPS=1
@@ -133,6 +149,7 @@ echo "==> Orca local macOS build"
 echo "    repo:      $ROOT_DIR"
 echo "    arch:      $ARCH_FLAG"
 echo "    mode:      $([[ "$FAST" -eq 1 ]] && echo "fast" || echo "full")"
+echo "    orcad:     $([[ "$WITH_ORCAD" -eq 1 ]] && echo "included" || echo "skipped (--no-orcad)")"
 echo "    sign:      $SIGN_IDENTITY"
 echo "    install:   $([[ "$INSTALL_APP" -eq 1 ]] && echo "/Applications/Orca.app" || echo "no")"
 echo "    compiler:  ORCA_CLI_BUILD_COMPILER=$ORCA_CLI_BUILD_COMPILER"
@@ -165,6 +182,18 @@ if [[ "$FAST" -eq 0 || ! -d "$ROOT_DIR/out/mobile-web" ]]; then
   run pnpm run build:mobile-web
 fi
 
+# 3b. Managed SSH remote server template (bundles custom main JS + mobile-web with cached native slots)
+if [[ "$WITH_ORCAD" -eq 1 ]]; then
+  if [[ -n "$ORCAD_FROM" ]]; then
+    run node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/ensure-orcad-prebuilds.mjs --from "$ORCAD_FROM"
+  else
+    run node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/ensure-orcad-prebuilds.mjs
+  fi
+  run pnpm run build:orcad-template
+else
+  run rm -rf "$ROOT_DIR/out/orcad-template"
+fi
+
 # 4. Native macOS Swift helpers
 if [[ "$FAST" -eq 0 || ! -d "$ROOT_DIR/native/computer-use-macos/.build/release/Orca Computer Use.app" ]]; then
   run pnpm run build:computer-macos
@@ -181,10 +210,9 @@ fi
 
 run pnpm run ensure:electron-runtime
 
-# 5. Compute local version identity (same format as upstream build-mac-local.mjs)
-BUILD_IDENTITY_JSON="$(node -e "import('./config/scripts/desktop-distribution/macos/build-mac-local.mjs').then(m => console.log(JSON.stringify(m.getLocalBuildIdentity())))")"
-ORCA_BUILD_COMMIT="$(node -e "const d = JSON.parse(process.argv[1]); console.log(d.commit)" "$BUILD_IDENTITY_JSON")"
-ORCA_LOCAL_BUILD_VERSION="$(node -e "const d = JSON.parse(process.argv[1]); console.log(d.version)" "$BUILD_IDENTITY_JSON")"
+# 5. Compute version identity (use package.json release version so same-version Managed SSH hosts auto-update instead of rejecting a `-local` prerelease as host-newer)
+ORCA_BUILD_COMMIT="$(git rev-parse --short=12 HEAD)"
+ORCA_LOCAL_BUILD_VERSION="$(node -p "require('./package.json').version")"
 echo "==> Packaging version: $ORCA_LOCAL_BUILD_VERSION (commit $ORCA_BUILD_COMMIT)"
 
 # 6. Package macOS .app directory (skip auto cert discovery for fast offline builds)

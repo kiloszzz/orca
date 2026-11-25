@@ -1667,7 +1667,9 @@
       "turnDiff": {
         "changedFiles_other": "{{count}} 个已更改的文件",
         "partial": "部分差异",
-        "showMoreFiles": "再显示 {{count}} 个"
+        "showMoreFiles": "再显示 {{count}} 个",
+        "showFewerFiles": "显示更少",
+        "collapseCard": "收起卡片"
       },
       "turnUsage": {
         "title": "本轮用量",

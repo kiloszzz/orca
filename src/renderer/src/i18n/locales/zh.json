@@ -20523,7 +20523,9 @@
         "changedFiles_other": "{{count}} 个已更改的文件",
         "hide": "隐藏",
         "hidden": "Orca 将不再显示每轮更改",
-        "showMoreFiles": "再显示 {{count}} 个文件"
+        "showMoreFiles": "再显示 {{count}} 个文件",
+        "showFewerFiles": "显示更少",
+        "collapseCard": "收起卡片"
       },
       "receipt": {
         "unavailable": "所选答案不可用",

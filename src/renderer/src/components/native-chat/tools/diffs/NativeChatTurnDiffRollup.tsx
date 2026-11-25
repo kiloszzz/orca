@@ -133,7 +133,7 @@ export function NativeChatTurnDiffRollup({
             <div className="flex items-center gap-1 pt-0.5">
               <Button variant="ghost" size="xs" onClick={() => setShowAll(!showAll)}>
                 {showAll
-                  ? t('components.native-chat.userMessage.showLess', 'Show less')
+                  ? t('components.native-chat.turnDiff.showFewerFiles', 'Show fewer')
                   : t('components.native-chat.turnDiff.showMoreFiles', 'Show {{count}} more', {
                       count: remaining
                     })}
@@ -147,7 +147,7 @@ export function NativeChatTurnDiffRollup({
                     setCardOpen(false)
                   }}
                 >
-                  {t('components.native-chat.prompt.collapse', 'Collapse')}
+                  {t('components.native-chat.turnDiff.collapseCard', 'Collapse card')}
                 </Button>
               ) : null}
             </div>

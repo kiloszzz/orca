@@ -134,7 +134,7 @@ export function MobileNativeChatTurnDiffRollup({
               >
                 <Text style={[styles.label, type.meta]}>
                   {showAll
-                    ? t('chat.nativeChatUserMessageFold.showLess', 'Show less')
+                    ? t('components.native-chat.turnDiff.showFewerFiles', 'Show fewer')
                     : t('components.native-chat.turnDiff.showMoreFiles', 'Show {{count}} more', {
                         count: remaining
                       })}
@@ -150,7 +150,7 @@ export function MobileNativeChatTurnDiffRollup({
                   }}
                 >
                   <Text style={[styles.label, type.meta]}>
-                    {t('session.nativeChatCardHeaderAction.collapse', 'Collapse')}
+                    {t('components.native-chat.turnDiff.collapseCard', 'Collapse card')}
                   </Text>
                 </Pressable>
               ) : null}

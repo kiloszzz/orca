@@ -1668,7 +1668,9 @@
         "changedFiles_one": "{{count}} changed file",
         "changedFiles_other": "{{count}} changed files",
         "partial": "Partial diff",
-        "showMoreFiles": "Show {{count}} more"
+        "showMoreFiles": "Show {{count}} more",
+        "showFewerFiles": "Show fewer",
+        "collapseCard": "Collapse card"
       },
       "turnUsage": {
         "title": "Turn usage",

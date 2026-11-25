@@ -21110,6 +21110,8 @@
         "changedFiles_one": "{{count}} changed file",
         "changedFiles_other": "{{count}} changed files",
         "showMoreFiles": "Show {{count}} more",
+        "showFewerFiles": "Show fewer",
+        "collapseCard": "Collapse card",
         "hide": "Hide",
         "hidden": "Orca won't show turn diffs anymore"
       },

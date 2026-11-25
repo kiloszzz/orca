@@ -23,7 +23,6 @@ import {
 import { useDetailCardScope } from '../../../../components/detail-cards/use-detail-card-scope'
 import {
   COMPOSER_CONTROL_HIT_SLOP,
-  COMPOSER_CONTROL_SIZE,
   composerInputStyles as inputStyles
 } from '../../../../components/composer-input/composer-input-styles'
 import { useKeyboardPersistingTaps } from '../../../../platform/keyboard/keyboard-persisting-taps'
@@ -144,7 +143,7 @@ const MobileNativeChatContextUsageRing = memo(function MobileNativeChatContextUs
         accessibilityLabel={label}
         aria-expanded={card.requestedOpen}
         testID="native-chat-context-usage"
-        style={({ pressed }) => [styles.trigger, pressed && inputStyles.pressed]}
+        style={({ pressed }) => [inputStyles.ghostButton, pressed && inputStyles.pressed]}
         onLayout={card.onAnchorLayout}
         onPress={card.toggle}
         hitSlop={COMPOSER_CONTROL_HIT_SLOP}
@@ -177,17 +176,6 @@ const MobileNativeChatContextUsageRing = memo(function MobileNativeChatContextUs
             strokeDashoffset={RING_CIRCUMFERENCE * (1 - filled / 100)}
           />
         </Svg>
-        <Text
-          style={[
-            styles.readout,
-            warning && styles.readoutWarning,
-            critical && styles.readoutCritical
-          ]}
-          numberOfLines={1}
-          accessible={false}
-        >
-          {`${usage.percentage}% · ${used}`}
-        </Text>
       </Pressable>
       <DetailCardFocusBoundary refs={card.boundaryRefs} index={1} active={card.active} />
       <AnchoredDetailCardLayer
@@ -253,23 +241,6 @@ const ringStyles = StyleSheet.create({
 })
 
 const styles = themedStyleSheet(() => ({
-  trigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    height: COMPOSER_CONTROL_SIZE,
-    minWidth: COMPOSER_CONTROL_SIZE,
-    paddingHorizontal: spacing.xs,
-    borderRadius: radii.pill
-  },
-  readout: {
-    color: colors.textMuted,
-    fontSize: typography.metaSize,
-    fontVariant: ['tabular-nums']
-  },
-  readoutWarning: { color: colors.statusAmber },
-  readoutCritical: { color: colors.statusRed },
   track: {
     height: 6,
     marginTop: spacing.sm,

@@ -31,6 +31,10 @@ import type { RuntimeFileOperationArgs } from '@/runtime/files/runtime-file-clie
 import { useNativeChatWorkRun } from '../../tools/runs/use-native-chat-work-run'
 import { useNativeChatRowNavigation } from '../actions/use-native-chat-row-navigation'
 import { useTranslate } from '@/i18n/use-translate'
+import {
+  NativeChatGalleryMessageContext,
+  nativeChatGalleryMessageId
+} from '../../media/images/gallery/native-chat-image-gallery-context'
 
 /** Unconfirmed sending status or a failed-delivery notice with an optional dismissal. */
 export type NativeChatDeliveryNotice =
@@ -105,9 +109,17 @@ function rowHasContent(content: ReturnType<typeof deriveNativeChatRowContent>): 
 }
 
 /** Memoize settled block identities so stream frames rerender only changed rows. */
-export const MessageRow = memo(function MessageRow(
-  props: MessageRowProps
-): React.JSX.Element | null {
+export const MessageRow = memo(function MessageRow(props: MessageRowProps): React.JSX.Element {
+  return (
+    <NativeChatGalleryMessageContext
+      value={nativeChatGalleryMessageId(props.message, props.activeTurnIsWorking)}
+    >
+      <MessageRowContent {...props} />
+    </NativeChatGalleryMessageContext>
+  )
+}, sameMessageRowProps)
+
+function MessageRowContent(props: MessageRowProps): React.JSX.Element | null {
   const t = useTranslate()
   const {
     message,
@@ -165,6 +177,7 @@ export const MessageRow = memo(function MessageRow(
           text={notStarted.text}
           timestamp={message.timestamp}
           error={notStarted.error}
+          refusal={notStarted.refusal}
           earlierFailures={mergedRunFailures(message)}
           resend={notStarted.sentAgain ? 'sent' : 'offer'}
           onRefolded={returnToView}
@@ -357,7 +370,7 @@ export const MessageRow = memo(function MessageRow(
       scrollToTop={scrollToTop}
     />
   )
-}, sameMessageRowProps)
+}
 
 /** A rebuilt transcript hands every run a fresh member list; same messages, same row. */
 function sameMessageRowProps(previous: MessageRowProps, next: MessageRowProps): boolean {

@@ -1,3 +1,4 @@
+import { NativeChatWaitingAgentMailRows } from '../../queue/NativeChatWaitingAgentMailRows'
 import { Fragment, useMemo } from 'react'
 import {
   NativeChatTranscriptRow,
@@ -17,6 +18,7 @@ import {
   NativeChatReplyRevealsContext,
   useNativeChatReplyReveals
 } from '../../markdown/native-chat-reply-reveals'
+import { NativeChatImageGallery } from '../../media/images/gallery/NativeChatImageGallery'
 
 /** Mounted rows own their height; only unloaded gaps use cached measurements. */
 export function NativeChatTranscriptItems({
@@ -44,70 +46,77 @@ export function NativeChatTranscriptItems({
   )
   return (
     <NativeChatReplyRevealsContext.Provider value={replyReveals}>
-      <div ref={window.sizerRef} data-native-chat-window className="relative w-full">
-        {window.virtualItems.map((item, position) => {
-          const slot = slots[item.index]
-          if (!slot) {
-            return null
-          }
-          const previousEnd = window.virtualItems[position - 1]?.end ?? window.scrollMargin
-          const leavesWhole = nativeChatSlotLeavesWhole(slot)
-          const startsUserTurn =
-            item.index > 0 &&
-            slot.kind === 'message' &&
-            slot.message.role === 'user' &&
-            !slot.message.from
-          return (
-            <Fragment key={item.key}>
-              <div aria-hidden style={{ height: Math.max(0, item.start - previousEnd) }} />
-              {/* A leaving row's negative top margin passes through to close the gap before it. */}
-              <div
-                data-index={item.index}
-                ref={window.measureRow}
-                className={
-                  leavesWhole
-                    ? 'w-full'
-                    : startsUserTurn
-                      ? 'flow-root w-full border-t border-chat-code-border pt-4'
-                      : 'flow-root w-full'
-                }
-              >
-                <NativeChatTranscriptRow
-                  slot={slot}
-                  context={rowContext}
-                  newRowsMarker={
-                    rowKeys[item.index] === newRowsMarker?.key ? newRowsMarker : undefined
-                  }
-                  newRowsMarkerBelow={
-                    newRowsMarker?.place === 'above-row' &&
-                    rowKeys[item.index + 1] === newRowsMarker.key
-                  }
-                  joinsActivityAbove={nativeChatSlotJoinsActivityAbove({
-                    slot,
-                    previous: slots[item.index - 1],
-                    timedRowsAfter: placed?.afterMessage,
-                    markerKey: newRowsMarker?.key,
-                    leavesWhole
-                  })}
-                />
-              </div>
-            </Fragment>
-          )
-        })}
+      <NativeChatImageGallery loadedMessageIds={loadedMessageIds}>
         <div
-          aria-hidden
-          style={{
-            height: Math.max(
-              0,
-              window.totalSize -
-                ((window.virtualItems.at(-1)?.end ?? window.scrollMargin) - window.scrollMargin)
+          ref={window.sizerRef}
+          data-native-chat-window
+          data-native-chat-gallery-root=""
+          className="relative w-full"
+        >
+          {window.virtualItems.map((item, position) => {
+            const slot = slots[item.index]
+            if (!slot) {
+              return null
+            }
+            const previousEnd = window.virtualItems[position - 1]?.end ?? window.scrollMargin
+            const leavesWhole = nativeChatSlotLeavesWhole(slot)
+            const startsUserTurn =
+              item.index > 0 &&
+              slot.kind === 'message' &&
+              slot.message.role === 'user' &&
+              !slot.message.from
+            return (
+              <Fragment key={item.key}>
+                <div aria-hidden style={{ height: Math.max(0, item.start - previousEnd) }} />
+                {/* A leaving row's negative top margin passes through to close the gap before it. */}
+                <div
+                  data-index={item.index}
+                  ref={window.measureRow}
+                  className={
+                    leavesWhole
+                      ? 'w-full'
+                      : startsUserTurn
+                        ? 'flow-root w-full border-t border-chat-code-border pt-4'
+                        : 'flow-root w-full'
+                  }
+                >
+                  <NativeChatTranscriptRow
+                    slot={slot}
+                    context={rowContext}
+                    newRowsMarker={
+                      rowKeys[item.index] === newRowsMarker?.key ? newRowsMarker : undefined
+                    }
+                    newRowsMarkerBelow={
+                      newRowsMarker?.place === 'above-row' &&
+                      rowKeys[item.index + 1] === newRowsMarker.key
+                    }
+                    joinsActivityAbove={nativeChatSlotJoinsActivityAbove({
+                      slot,
+                      previous: slots[item.index - 1],
+                      timedRowsAfter: placed?.afterMessage,
+                      markerKey: newRowsMarker?.key,
+                      leavesWhole
+                    })}
+                  />
+                </div>
+              </Fragment>
             )
-          }}
-        />
-      </div>
-      {placed?.unplaced.map(({ key, node }) => (
-        <div key={key}>{node}</div>
-      ))}
+          })}
+          <div
+            aria-hidden
+            style={{
+              height: Math.max(
+                0,
+                window.totalSize -
+                  ((window.virtualItems.at(-1)?.end ?? window.scrollMargin) - window.scrollMargin)
+              )
+            }}
+          />
+        </div>
+        {placed?.unplaced.map(({ key, node }) => (
+          <div key={key}>{node}</div>
+        ))}
+      </NativeChatImageGallery>
     </NativeChatReplyRevealsContext.Provider>
   )
 }
@@ -115,10 +124,13 @@ export function NativeChatTranscriptItems({
 /** Rows drawn after the live turn's activity, outside the window: few, and the newest there are. */
 export function NativeChatWaitingTranscriptItems({
   slots,
-  context
+  context,
+  agentMail = true
 }: {
   slots: readonly NativeChatTranscriptSlot[]
   context: NativeChatTranscriptRowContext
+  /** Ends with other agents' waiting mail; rows stacked outside a conversation have none. */
+  agentMail?: boolean
 }): React.JSX.Element {
   return (
     <>
@@ -136,6 +148,7 @@ export function NativeChatWaitingTranscriptItems({
           })}
         />
       ))}
+      {agentMail ? <NativeChatWaitingAgentMailRows /> : null}
     </>
   )
 }
@@ -151,7 +164,7 @@ export function NativeChatTranscriptRowStack({
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-5">
-      <NativeChatWaitingTranscriptItems slots={slots} context={context} />
+      <NativeChatWaitingTranscriptItems slots={slots} context={context} agentMail={false} />
     </div>
   )
 }

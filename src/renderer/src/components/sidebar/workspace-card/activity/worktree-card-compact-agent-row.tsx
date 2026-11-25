@@ -45,14 +45,15 @@ export function getCompactAgentStatus(
   presentation: ProgramStatusPresentation = resolveRowProgramStatus(agent).presentation,
   t?: Translate
 ): string | null {
+  const tr = t ?? translate
   return compactAgentStatusLine({
     entry: agent.entry,
     state: agent.state,
     presentation,
     now,
     labels: {
-      stopping: (t ?? translate)('components.native-chat.status.stopping', 'Stopping…'),
-      monitoring: agentStateLabel('monitoring')
+      stopping: tr('components.native-chat.status.stopping', 'Stopping…'),
+      monitoring: agentStateLabel('monitoring', tr)
     },
     ...(lastAssistantMessageOverride !== undefined
       ? { lastAssistantMessage: lastAssistantMessageOverride }
@@ -321,6 +322,7 @@ export const CompactAgentRow = React.memo(function CompactAgentRow({
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
       onDragStart={(e) => e.stopPropagation()}
+      data-workspace-agent-row=""
       data-focused-agent-pane={highlighted ? 'true' : undefined}
       data-agent-row-unread={isUnreadDone ? 'true' : undefined}
       data-current={view?.current ? 'true' : undefined}

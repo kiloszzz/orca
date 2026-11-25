@@ -48,7 +48,7 @@ export class AcpTimelineTranslator {
   /** Drained by the lane in journal order. */
   readonly subagents = new AcpSubagents()
   readonly children: AcpChildSessions
-  private readonly ownership = new AcpTimelineOwnership()
+  protected readonly ownership: AcpTimelineOwnership
   private readonly started = new BoundedMap<string, true>({ maxEntries: 128 })
   readonly elicitations = new AcpUrlElicitations()
   readonly failures: AcpTurnFailures
@@ -59,6 +59,7 @@ export class AcpTimelineTranslator {
   private readonly agentTurns: AcpAgentTurns
 
   constructor(private readonly options: AcpTimelineTranslatorOptions) {
+    this.ownership = new AcpTimelineOwnership()
     this.dialect = options.dialect ?? GENERIC_ACP_DIALECT
     this.context = new AcpContextTimeline(this.dialect, options.currentModelId)
     this.providerSessionId = options.sessionId

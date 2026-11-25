@@ -52,7 +52,10 @@ export const NATIVE_CHAT_AGENTS = [
   'gemini',
   'droid',
   'qwen-code',
-  'dsh-acp'
+  'dsh-acp',
+  'cline',
+  'devin',
+  'codebuddy'
 ] as const
 
 export type NativeChatAgent = (typeof NATIVE_CHAT_AGENTS)[number]
@@ -84,7 +87,12 @@ const AGENT_CHAT_PERMISSION_MODES_BY_AGENT: Record<
   gemini: ACP_CHAT_PERMISSION_MODES,
   // Qwen's own modes: Auto Edit approves edits, and Auto has a model approve what is safe.
   'qwen-code': CLAUDE_CHAT_PERMISSION_MODES,
-  'dsh-acp': ACP_CHAT_PERMISSION_MODES
+  'dsh-acp': ACP_CHAT_PERMISSION_MODES,
+  cline: ACP_CHAT_PERMISSION_MODES,
+  // Devin's own modes: Code approves edits, and Smart has a model approve what is safe.
+  devin: CLAUDE_CHAT_PERMISSION_MODES,
+  // CodeBuddy's own modes, as Claude Code's: Accept Edits, and Auto has a model review each action.
+  codebuddy: CLAUDE_CHAT_PERMISSION_MODES
 }
 
 export function isNativeChatAgent(agent: string): agent is NativeChatAgent {

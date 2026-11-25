@@ -52,7 +52,7 @@ import { MobileNativeChatAnswerProse } from '../message-content/MobileNativeChat
 import { Prose, userProseText } from '../message-content/MobileNativeChatProse'
 import * as Marks from './MobileNativeChatUserMessageMarks'
 
-function MobileNativeChatMessageImpl({
+export const MobileNativeChatMessage = memo(function MobileNativeChatMessageImpl({
   message: rowMessage,
   rowKey,
   runOwner,
@@ -157,7 +157,6 @@ function MobileNativeChatMessageImpl({
           Chat.isTextBlock(block) && block.presentation === PULL_REQUEST_EVENT_PRESENTATION
       )
     : undefined
-  const showToolRun = tools.length > 0
   const askPending = structuredActivityUi
     ? selectActiveToolCall(unansweredAsks, { activeTurnIsWorking }) !== null
     : unansweredAsks.length > 0
@@ -236,9 +235,8 @@ function MobileNativeChatMessageImpl({
   }
   if (isReasoning && !workRun) {
     const markdown = deriveNativeChatRowContent(message.blocks).markdown
-    const draws = markdown.trim().length > 0 && !reasoningIsLive
     return withStatus(
-      draws && (
+      markdown.trim().length > 0 && !reasoningIsLive && (
         <View style={styles.row} testID={mobileNativeChatRowId(rowId)}>
           <MobileNativeChatReasoningRow
             message={message}
@@ -254,7 +252,6 @@ function MobileNativeChatMessageImpl({
       )
     )
   }
-  const isChatTurn = message.role === 'user' || message.role === 'assistant'
   // Paced prose calls this from its own renders too, so the key must not depend on earlier calls.
   const proseRow = (block: Chat.NativeChatBlock, key: number, text: string, revealing = false) => {
     const textKey = `${message.id}:text:${key}`
@@ -328,6 +325,7 @@ function MobileNativeChatMessageImpl({
                   fontScale={fontScale}
                   onLongPress={onLongPress}
                   cardId={message.id}
+                  timestamp={message.timestamp}
                 />
               ) : null}
               {isUser ? (
@@ -366,7 +364,7 @@ function MobileNativeChatMessageImpl({
             />
           ))}
           {askRow}
-          {showToolRun ? (
+          {tools.length > 0 ? (
             <ToolRun
               blocks={tools}
               disclosureId={runOwner ?? rowId}
@@ -397,7 +395,7 @@ function MobileNativeChatMessageImpl({
         {isUser ? <Marks.MobileNativeChatUserMessageNotes message={message} /> : null}
         {unsentNotice ? <Text style={styles.unsentNotice}>{unsentNotice}</Text> : null}
         {/* Always shown, so the row never shifts when copy appears. */}
-        {isChatTurn && !agentFrom ? (
+        {(message.role === 'user' || message.role === 'assistant') && !agentFrom ? (
           <MobileNativeChatMessageMeta
             message={message}
             rowKey={rowKey ?? message.id}
@@ -410,6 +408,4 @@ function MobileNativeChatMessageImpl({
       {turnStatusAbove ? null : statusRow}
     </>
   )
-}
-
-export const MobileNativeChatMessage = memo(MobileNativeChatMessageImpl)
+})

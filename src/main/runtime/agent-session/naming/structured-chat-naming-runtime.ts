@@ -90,7 +90,10 @@ export function structuredChatNamingDeps(
           'gemini',
           'droid',
           'qwen-code',
-          'dsh-acp'
+          'dsh-acp',
+          'cline',
+          'devin',
+          'codebuddy'
         ].includes(record.provider)
       ) {
         return null

@@ -7,6 +7,7 @@ import {
   type AgentSessionContextUsage,
   type AgentSessionContextWindow
 } from '../../../shared/agent-session/conversation-context/agent-session-context-usage'
+import type { AgentSessionTurnUsage } from '../../../shared/agent-session/conversation-context/agent-session-turn-usage'
 import {
   agentJournalItemKey,
   parseAgentJournalItemKey
@@ -32,6 +33,8 @@ export type AgentJournalTurnRowWrite = {
   lifecycle?: AgentJournalTurnItem
   /** Replace only the supplied context parts. */
   contextUsage?: AgentSessionContextUsage
+  /** Replace the turn's aggregate token and cache usage. */
+  turnUsage?: AgentSessionTurnUsage
   /** Supply a window only when no journal row holds one. */
   windowIfNoneHeld?: AgentSessionContextWindow
   /** Never overwrite ended turns. */
@@ -78,18 +81,23 @@ function contextBytesBound(write: AgentSessionContextUsage | undefined): number 
 
 /** Reserve lifecycle space even for rows created by other writers. */
 const TURN_ROW_BYTES_WITHOUT_CONTEXT = 8 * 1024
+/** Conservative JSON bound for compact per-turn token usage metadata. */
+const TURN_USAGE_BYTES_BOUND = 256
 
 function reviseTurnBody(
   current: AgentJournalTurnItem | null,
   write: AgentJournalTurnRowWrite
 ): AgentJournalTurnItem | null {
-  const { lifecycle, contextUsage } = write
+  const { lifecycle, contextUsage, turnUsage } = write
   const base =
     lifecycle && current ? { ...withoutLifecycle(current), ...lifecycle } : (lifecycle ?? current)
-  if (!base || !contextUsage) {
-    return base
+  if (!base) {
+    return null
   }
-  return { ...base, contextUsage: { ...current?.contextUsage, ...contextUsage } }
+  const withContext = contextUsage
+    ? { ...base, contextUsage: { ...current?.contextUsage, ...contextUsage } }
+    : base
+  return turnUsage ? { ...withContext, turnUsage } : withContext
 }
 
 function withoutLifecycle(turn: AgentJournalTurnItem) {
@@ -146,7 +154,9 @@ export function agentJournalTurnRowReservedBytes(
   return (
     (known && write.lifecycle
       ? estimateStructuredAgentSessionItemBytes(known, write.lifecycle)
-      : TURN_ROW_BYTES_WITHOUT_CONTEXT) + contextBytesBound(write.contextUsage)
+      : TURN_ROW_BYTES_WITHOUT_CONTEXT) +
+    contextBytesBound(write.contextUsage) +
+    TURN_USAGE_BYTES_BOUND
   )
 }
 

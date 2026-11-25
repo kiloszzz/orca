@@ -17,6 +17,7 @@ import type { AgentSessionQuestionAnswer } from '../requests/prompts/agent-sessi
 import type { AgentJournalTurnOutcome } from '../../agent-status/lifecycle/agent-turn-outcome'
 import type { NativeChatToolMetadata } from '../../native-chat/tools/native-chat-tool-identity'
 import type { AgentSessionContextUsage } from '../conversation-context/agent-session-context-usage'
+import type { AgentSessionTurnUsage } from '../conversation-context/agent-session-turn-usage'
 import type { NativeChatBlock, NativeChatRole } from '../../native-chat/native-chat-types'
 import type { AgentMessageSource } from './agent-session-message-source'
 import type { AgentSessionExecutionOptions } from '../options/protocol/agent-session-execution-options'
@@ -246,6 +247,8 @@ export type AgentJournalTurnLifecycle = {
   /** What the provider said about its context window during or after this turn.
    *  Usually written by a later revision, since the provider answers after the end. */
   contextUsage?: AgentSessionContextUsage
+  /** Normalized per-turn aggregate token and prompt-cache usage. */
+  turnUsage?: AgentSessionTurnUsage
   /** On a turn a conversation command opened: the provider turn that carried out the command,
    *  once the provider opened one. Nothing else re-derives it after the command settles. */
   providerTurnId?: string
@@ -363,10 +366,7 @@ export type AgentJournalRowAttribution = AgentJournalProducerLinkage & {
   turnScope: AgentJournalTurnScope
 }
 
-export type AgentJournalPosition = {
-  sequence: number
-  index: number
-}
+export type AgentJournalPosition = { sequence: number; index: number }
 
 /** Order by sequence; provider observedAt can precede earlier sequences after crash recovery. */
 export type AgentJournalRenderItem = AgentJournalProducerLinkage & {

@@ -17,6 +17,7 @@ import {
   AcpConnectionClosedError
 } from '../transport/acp-errors'
 import { acpPromptRejection } from './acp-prompt-failure'
+import { dispatchAcpFallbackTurnUsage } from '../timeline/acp-turn-usage'
 import type { ContentBlock } from '../generated/acp-protocol.generated'
 
 type Send = { clientMessageId: string; prompt: ContentBlock[]; requestedAt: number }
@@ -242,9 +243,15 @@ export class AcpStructuredTurns {
           return
         }
         const cancelled = this.stopAt !== null || this.steerCancelled === send
-        const { clientMessageId } = send
         lane.apply(
-          lane.translator.promptResult(clientMessageId, result, this.deps.now(), cancelled)
+          lane.translator.promptResult(send.clientMessageId, result, this.deps.now(), cancelled)
+        )
+        dispatchAcpFallbackTurnUsage(
+          this.deps,
+          send.clientMessageId,
+          result,
+          cancelled,
+          () => this.ended
         )
         this.accept(send.clientMessageId)
         this.finishAndRetireIfLost(send, lane.translator.failures.takeSessionLoss())
@@ -256,13 +263,8 @@ export class AcpStructuredTurns {
         }
         if (!(error instanceof AcpAgentError)) {
           // Unreadable replies fail the turn but allow the next send.
-          lane.apply(
-            lane.translator.promptFailed(
-              send.clientMessageId,
-              error instanceof Error ? error : new Error(String(error)),
-              this.deps.now()
-            )
-          )
+          const failure = error instanceof Error ? error : new Error(String(error))
+          lane.apply(lane.translator.promptFailed(send.clientMessageId, failure, this.deps.now()))
           this.accept(send.clientMessageId)
           this.finish(send)
           return

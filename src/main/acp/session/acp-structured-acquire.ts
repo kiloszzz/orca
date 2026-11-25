@@ -48,10 +48,7 @@ export async function acquireAcpStructuredSession(input: {
   onConnectionLost: (session: childState.AcpStructuredChild | null, error: Error) => void
   onSettled: AcpStructuredTurnsDeps['settle']
   forceClose: (sessionId: string, reason: string) => void
-}): Promise<{
-  acquisition: AgentSessionAcquisition
-  session: childState.AcpStructuredChild
-}> {
+}): Promise<{ acquisition: AgentSessionAcquisition; session: childState.AcpStructuredChild }> {
   const { acquire, deps, generation } = input
   const agentName = acpAgentName(deps.spec.agent)
   const logger = deps.logger ?? createStructuredAgentSessionLogger()
@@ -212,6 +209,7 @@ export async function acquireAcpStructuredSession(input: {
       dialect: spec.dialect,
       now,
       childStops: () => session?.childStops ?? NO_ACP_CHILD_STOPS,
+      currentModelId: () => options.currentModelId(),
       ...acpLaneChildWorkDelivery(deps, sessionId, events),
       logger,
       onInputAccepted: (clientMessageId) => {

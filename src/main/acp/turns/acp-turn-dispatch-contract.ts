@@ -1,6 +1,7 @@
 import type { SubmissionRejectionFact } from '../../../shared/agent-session/failures/agent-session-failure'
 import type { AgentJournalDispatchRejection } from '../../../shared/agent-session/failures/agent-session-failure-words'
 import type { AgentJournalItemIdentity } from '../../../shared/agent-session/journal/agent-session-journal-identity'
+import type { AgentSessionTurnUsage } from '../../../shared/agent-session/conversation-context/agent-session-turn-usage'
 import type { AcpAgentError } from '../transport/acp-errors'
 import type { AcpStructuredConnection } from '../process/acp-structured-connection'
 import type { AcpStructuredLane } from '../journal/acp-structured-lane'
@@ -24,4 +25,6 @@ export type AcpStructuredTurnsDeps = {
   sessionLost: (error: Error) => void
   /** The agent had no model for the prompt, which it may word like a sign-in failure. */
   modelRefusal?: (error: AcpAgentError) => SubmissionRejectionFact | undefined
+  /** Fallback per-turn usage lookup when an ACP server omits `PromptResponse.usage`. */
+  resolveFallbackTurnUsage?: () => Promise<AgentSessionTurnUsage | undefined>
 }

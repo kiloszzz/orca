@@ -21769,6 +21769,23 @@
         "estimated": "Estimated from the last response.",
         "deferredNote": "Loaded on demand. Not counted in the used total."
       },
+      "turnUsage": {
+        "title": "Turn usage",
+        "ariaLabel": "Turn usage: {{total}} tokens",
+        "ariaLabelWithCache": "Turn usage: {{total}} tokens, {{rate}} cache hit",
+        "inlineTokens": "{{total}} tokens",
+        "inlineCache": "{{rate}} cache",
+        "totalTokens": "{{total}} tokens",
+        "cacheHitRate": "Cache hit rate",
+        "cacheHitProgress": "Cache hit rate {{rate}}",
+        "cacheSummary": "{{cached}} / {{input}} input tokens cached",
+        "cachedInput": "Cached input",
+        "uncachedInput": "Uncached input",
+        "input": "Input",
+        "cacheWrite": "Cache write",
+        "output": "Output",
+        "reasoning": "Reasoning"
+      },
       "contextMenu": {
         "copyOrcaSessionId": "Copy Orca Session ID",
         "orcaSessionIdCopied": "Orca session ID copied",

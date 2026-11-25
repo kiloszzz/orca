@@ -1,5 +1,5 @@
 import type { ProviderTimelineEvent } from '../../native-chat/agent-session-timeline/provider-timeline-event'
-import { acpWindowUsage } from './acp-context-usage'
+import { acpWindowUsage, type AcpContextTimeline } from './acp-context-usage'
 import type { AcpDialect } from '../acp-dialects/acp-dialect'
 import type { AcpBackgroundTaskTimeline } from './acp-background-task-timeline'
 import type { AcpSubagents } from './acp-subagents'
@@ -26,6 +26,7 @@ export function acpSessionUpdate(
   context: {
     tools: AcpToolTimeline
     dialect: AcpDialect
+    contextUsage?: AcpContextTimeline
     backgroundTasks: AcpBackgroundTaskTimeline
     subagents: AcpSubagents
     failures: AcpTurnFailures
@@ -115,7 +116,9 @@ export function acpSessionUpdate(
         }
       ]
     case 'usage_update':
-      return [{ type: 'context.usage', usage: acpWindowUsage(update, at), ...join }]
+      return context.contextUsage
+        ? context.contextUsage.usageUpdate(update, at, join.join)
+        : [{ type: 'context.usage', usage: acpWindowUsage(update, at, context.dialect), ...join }]
     case 'available_commands_update':
     case 'current_mode_update':
     case 'config_option_update':

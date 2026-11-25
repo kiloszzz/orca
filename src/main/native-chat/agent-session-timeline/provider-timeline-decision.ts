@@ -22,7 +22,8 @@ import {
   decideSessionEnd,
   decideTurnEnd,
   decideTurnOpen,
-  decideTurnSettled
+  decideTurnSettled,
+  decideTurnUsage
 } from './provider-timeline-turn-decisions'
 
 export type ProviderTimelineDropRule =
@@ -101,6 +102,8 @@ export function decideProviderTimelineEvent(
       return decideRequestSubject(input, event)
     case 'context.usage':
       return decideContextUsage(input, event)
+    case 'turn.usage':
+      return decideTurnUsage(input, event)
     case 'provider.frame':
       return decideFrame(input, event)
     case 'session.ended':

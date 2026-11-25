@@ -1,5 +1,6 @@
 import type { AgentSessionAccountKind } from '../../../shared/agent-session/failures/agent-session-availability'
 import type { AgentSessionContextUsage } from '../../../shared/agent-session/conversation-context/agent-session-context-usage'
+import type { AgentSessionTurnUsage } from '../../../shared/agent-session/conversation-context/agent-session-turn-usage'
 import type { AgentSessionUsageLimit } from '../../../shared/agent-session/failures/agent-session-usage-limit'
 import type { AgentSessionInteractionMode } from '../../../shared/agent-session/options/permissions/agent-session-interaction-mode'
 import type {
@@ -20,7 +21,8 @@ import type {
   InitializeResponse,
   ModelInfo,
   SessionNotification,
-  ToolCallUpdate
+  ToolCallUpdate,
+  Usage
 } from '../generated/acp-protocol.generated'
 
 export const pendingAcpResolution = {
@@ -127,6 +129,8 @@ export type AcpTurnEnding = {
   hookBlock?: AcpHookBlock
   /** Orca asked the agent to stop this prompt, whatever reason it then gave. */
   cancelRequested?: boolean
+  /** Aggregate token usage reported for this turn. */
+  turnUsage?: AgentSessionTurnUsage
 }
 
 /** Undefined means a normally ended /compact succeeded. */
@@ -188,6 +192,13 @@ export type AcpDialect = {
     params: unknown
   ): { sessionId: string; promptId: string; stopReason: string } | undefined
   contextWindow?(models: unknown): number | undefined
+  /** Resolve effective context window tokens from a reported size and active model id. */
+  resolveContextWindow?(input: {
+    reportedTokens?: number
+    modelId?: string | null
+  }): number | undefined
+  /** Normalize provider-specific PromptResponse usage into canonical turn usage. */
+  normalizeTurnUsage?(usage: Usage): AgentSessionTurnUsage | undefined
   modelEfforts?(model: ModelInfo): AcpAdvertisedEfforts
   /** Efforts of a listed model family that `models` advertises only as per-effort variants. */
   familyEfforts?(family: string, models: readonly ModelInfo[]): AcpAdvertisedEfforts | undefined

@@ -4,6 +4,7 @@
 // Each provider child gets a new generation; session.ended rejects all later events.
 
 import type { AgentSessionContextUsage } from '../../../shared/agent-session/conversation-context/agent-session-context-usage'
+import type { AgentSessionTurnUsage } from '../../../shared/agent-session/conversation-context/agent-session-turn-usage'
 import type {
   AgentJournalApprovalItem,
   AgentJournalApprovalSubject,
@@ -63,6 +64,7 @@ export type ProviderTimelineEvent =
       /** Absent provider verdict remains unknown. */
       outcome?: AgentJournalTurnOutcome
       durationMs?: number
+      turnUsage?: AgentSessionTurnUsage
     }
   /** Background-task messages outlive their initiating call/turn and become unverifiable on session end. */
   | ({ type: 'item.open'; item: string; body: ProviderTimelineItemBody } & Produced & Joined)
@@ -100,6 +102,8 @@ export type ProviderTimelineEvent =
   | { type: 'request.subject'; request: string; subject: AgentJournalApprovalSubject }
   /** Use the named turn, otherwise open turn, otherwise last turn. */
   | ({ type: 'context.usage'; usage: AgentSessionContextUsage } & Joined)
+  /** Record aggregate per-turn token and cache usage on the named, open, or latest turn. */
+  | ({ type: 'turn.usage'; usage: AgentSessionTurnUsage } & Joined)
   | { type: 'activity'; text: string | null }
   /** Unmodeled traffic uses the bounded fallback row. */
   | ({ type: 'provider.frame'; frameKind: string; payload: unknown } & Joined)

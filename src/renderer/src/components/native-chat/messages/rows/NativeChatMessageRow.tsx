@@ -1,5 +1,6 @@
 import { memo, useRef } from 'react'
 import type { AgentSessionAccountKind } from '../../../../../../shared/agent-session/failures/agent-session-availability'
+import type { AgentSessionTurnUsage } from '../../../../../../shared/agent-session/conversation-context/agent-session-turn-usage'
 import type { NativeChatRewindSurface } from '../actions/use-native-chat-rewind-host'
 import type { NativeChatForkRowAction } from '../actions/use-native-chat-fork'
 import { NativeChatUserMessageRow } from './NativeChatUserMessageRow'
@@ -74,6 +75,8 @@ export type MessageRowProps = {
   /** In a turn: whether this row holds the response's actions (its last words, else its last images). */
   endsResponse?: boolean
   latestResponse?: boolean
+  /** Aggregate per-turn token and cache usage shown in the response controls. */
+  turnUsage?: AgentSessionTurnUsage
   /** Response controls may hang into the gap below; otherwise they keep their own height. */
   actionsHang?: boolean
   /** Align this message's top to the top of the scroll viewport. */

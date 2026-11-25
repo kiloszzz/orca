@@ -196,6 +196,36 @@ export function antigravityModelChoices(
   return [...choices].map(([id, label]) => ({ id, label }))
 }
 
+/** Effective context window ceilings for Antigravity models whose ACP usage_update reports a larger theoretical size. */
+const ANTIGRAVITY_MODEL_CONTEXT_WINDOW_CEILINGS: ReadonlyMap<string, number> = new Map([
+  ['gemini-4-neon', 512_000],
+  ['gemini-4-carbon', 512_000],
+  ['gemini-4-argon', 512_000],
+  ['gemini-4-hydrogen', 512_000],
+  ['gemini-pro-orchestrator-neon', 512_000],
+  ['gemini-pro-orchestrator', 512_000],
+  ['gemini-pro-orchestrator-argon', 512_000],
+  ['gemini-3.8-flash', 256_000]
+])
+
+function resolveAntigravityContextWindow({
+  reportedTokens,
+  modelId
+}: {
+  reportedTokens?: number
+  modelId?: string | null
+}): number | undefined {
+  const trimmed = modelId?.trim()
+  const family = trimmed ? (ANTIGRAVITY_LEVEL_SUFFIX.exec(trimmed)?.[1] ?? trimmed) : null
+  const ceiling = family ? ANTIGRAVITY_MODEL_CONTEXT_WINDOW_CEILINGS.get(family) : undefined
+  if (ceiling === undefined) {
+    return reportedTokens
+  }
+  return reportedTokens !== undefined && reportedTokens > 0
+    ? Math.min(reportedTokens, ceiling)
+    : ceiling
+}
+
 export const ANTIGRAVITY_ACP_DIALECT: AcpDialect = {
   // With forms, ask_question carries a write-in field per question; permissions cannot carry text.
   clientCapabilities: { elicitation: { form: {} } },
@@ -222,5 +252,6 @@ export const ANTIGRAVITY_ACP_DIALECT: AcpDialect = {
   toolName: (update) => (update.kind === 'execute' ? 'execute' : undefined),
   // Logout would clear the account shared by every Antigravity chat on this host.
   withheldCommands: ['logout'],
+  resolveContextWindow: resolveAntigravityContextWindow,
   familyEfforts
 }

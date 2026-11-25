@@ -11,6 +11,7 @@ import type {
   AgentJournalTurnLifecycle
 } from '../../journal/agent-session-journal-types'
 import { isAdmissibleAgentSessionContextUsage } from '../../conversation-context/agent-session-context-usage-schema'
+import { isAdmissibleAgentSessionTurnUsage } from '../../conversation-context/agent-session-turn-usage'
 import { agentTurnLifecycleText } from '../../../agent-status/presentation/agent-turn-lifecycle-text'
 import { tuiAgentDisplayName } from '../../../agent-launch/catalog/tui-agent-display-names'
 
@@ -55,6 +56,7 @@ export function agentJournalTurnBody(turn: AgentJournalTurnLifecycle): AgentJour
     completedAt,
     durationMs,
     contextUsage: savedContextUsage,
+    turnUsage: savedTurnUsage,
     providerTurnId,
     ...extensions
   } = turn
@@ -74,6 +76,7 @@ export function agentJournalTurnBody(turn: AgentJournalTurnLifecycle): AgentJour
     ...(isAdmissibleAgentSessionContextUsage(savedContextUsage)
       ? { contextUsage: savedContextUsage }
       : {}),
+    ...(isAdmissibleAgentSessionTurnUsage(savedTurnUsage) ? { turnUsage: savedTurnUsage } : {}),
     ...(nonemptyString(providerTurnId) ? { providerTurnId } : {})
   }
 }

@@ -7,6 +7,10 @@ import type {
   AgentJournalTurnLifecycleState
 } from '../journal/agent-session-journal-types'
 import {
+  isAdmissibleAgentSessionTurnUsage,
+  type AgentSessionTurnUsage
+} from '../conversation-context/agent-session-turn-usage'
+import {
   readAgentJournalTurn,
   readAgentJournalTurnOutcome
 } from '../lifecycle/records/agent-session-turn-record'
@@ -35,6 +39,8 @@ export type StructuredAgentTurnTiming = {
   observedAt: number
   /** The turn's verdict, the provider's or the host-observed end's; absent when unknown. */
   verdict?: AgentTurnOutcome
+  /** Normalized per-turn aggregate token and prompt-cache usage. */
+  turnUsage?: AgentSessionTurnUsage
 }
 
 function readTiming(
@@ -61,6 +67,7 @@ function readTiming(
       ? durationMs
       : undefined
   const verdict = agentTurnVerdict({ state, outcome: readAgentJournalTurnOutcome(turn) })
+  const turnUsage = isAdmissibleAgentSessionTurnUsage(turn.turnUsage) ? turn.turnUsage : undefined
   return {
     state,
     startedAt,
@@ -68,7 +75,8 @@ function readTiming(
     ...(end !== undefined ? { completedAt: end } : {}),
     ...(measured !== undefined ? { durationMs: measured } : {}),
     observedAt: item.observedAt,
-    ...(verdict ? { verdict } : {})
+    ...(verdict ? { verdict } : {}),
+    ...(turnUsage ? { turnUsage } : {})
   }
 }
 
@@ -188,7 +196,8 @@ function settledTurnsOf(
         : {
             startedAt: timing.startedAt,
             workedSeconds,
-            ...(timing.verdict ? { verdict: timing.verdict } : {})
+            ...(timing.verdict ? { verdict: timing.verdict } : {}),
+            ...(timing.turnUsage ? { turnUsage: timing.turnUsage } : {})
           }
     )
   }

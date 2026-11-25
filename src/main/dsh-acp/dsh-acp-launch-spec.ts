@@ -6,6 +6,7 @@ import { agentSessionSetupFor } from '../../shared/agent-session/lifecycle/launc
 import { dshAcpFallbackModelOptions } from '../../shared/agent-session/options/agent-session-option-catalog-dsh-acp'
 import type { StructuredAgentSessionHistory } from '../native-chat/conversation-adoption/structured-agent-cli-conversations'
 import { DSH_ACP_TRANSCRIPT_IMPORT } from './dsh-acp-transcript-import'
+import { resolveDshAcpTurnUsage } from './dsh-acp-turn-usage'
 
 // Chats and Session History share $DSH_HOME/sessions and UUID/session-* ids.
 const DSH_ACP_SESSION_HISTORY: StructuredAgentSessionHistory = {
@@ -34,5 +35,6 @@ export const DSH_ACP_LAUNCH_SPEC: AcpLaunchSpec = {
   keepsEverySession: true,
   resumePreference: 'resume',
   transcriptImport: DSH_ACP_TRANSCRIPT_IMPORT,
-  sessionHistory: DSH_ACP_SESSION_HISTORY
+  sessionHistory: DSH_ACP_SESSION_HISTORY,
+  resolveFallbackTurnUsage: resolveDshAcpTurnUsage
 }

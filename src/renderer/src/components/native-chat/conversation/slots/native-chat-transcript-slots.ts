@@ -8,6 +8,7 @@ import { nativeChatAutomationTurnKeys } from '../../../../../../shared/native-ch
 import { nativeChatActingTurnKeys } from '../../../../../../shared/native-chat/transcript/turns/native-chat-acting-turns'
 import { isNativeChatOrcaCard } from '../../../../../../shared/native-chat/native-chat-orca-card'
 import type { NativeChatTurnStatus } from '../../../../../../shared/native-chat/transcript/turns/native-chat-turn-status'
+import type { AgentSessionTurnUsage } from '../../../../../../shared/agent-session/conversation-context/agent-session-turn-usage'
 import { isNativeChatRowInLiveWorkingTurn } from '../../../../../../shared/native-chat/transcript/turns/native-chat-live-turn-membership'
 import { nativeChatTurnBarRows } from '../../../../../../shared/native-chat/transcript/turns/native-chat-turn-grouping'
 import {
@@ -95,6 +96,8 @@ export type NativeChatMessageSlot = {
   endsResponse?: boolean
   /** This response is the newest one in the conversation. */
   latestResponse?: boolean
+  /** Aggregate per-turn token and cache usage, attached to the turn's response action holder. */
+  turnUsage?: AgentSessionTurnUsage
   /** Response controls under this row may hang into the gap below it: the row draws nothing after
    *  its message, and what follows opens the next turn (the person's bubble or an agent's card).
    *  Absent when anything else follows (a notice, a task or subagent row, the turn's bar, diff
@@ -296,12 +299,11 @@ export function buildNativeChatTranscript(
       lastImageByTurn.set(slot.turnKey, slot)
     }
   }
-  for (const slot of lastWordsByTurn.values()) {
+  for (const [turnKey, slot] of new Map([...lastImageByTurn, ...lastWordsByTurn])) {
     slot.endsResponse = true
-  }
-  for (const [turnKey, slot] of lastImageByTurn) {
-    if (!lastWordsByTurn.has(turnKey)) {
-      slot.endsResponse = true
+    const usage = turnStatuses.completedByTurn[turnKey]?.turnUsage
+    if (usage) {
+      slot.turnUsage = usage
     }
   }
   const latestResponse = drawn.findLast(

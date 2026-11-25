@@ -1,19 +1,23 @@
 import { ArrowUp } from 'lucide-react'
 import { cn } from '../../../../lib/class-names'
 import { useTranslate } from '../../../../i18n/use-translate'
+import type { AgentSessionTurnUsage } from '../../../../../../shared/agent-session/conversation-context/agent-session-turn-usage'
 import { NativeChatCopyButton } from './NativeChatCopyButton'
 import { NativeChatMessageTimestamp } from '../rows/NativeChatMessageTimestamp'
+import { NativeChatTurnUsageBadge } from '../../usage/NativeChatTurnUsageBadge'
 import { withoutNativeChatVisualDirectiveLines } from '../../../../../../shared/native-chat/visuals/native-chat-visual-directive'
 
 export function NativeChatAgentControls({
   markdown,
   timestamp,
+  turnUsage,
   onScrollToTop,
   action,
   className
 }: {
   markdown: string
   timestamp: number | null
+  turnUsage?: AgentSessionTurnUsage
   onScrollToTop: () => void
   /** A row action of its own, drawn beside Copy (Fork). */
   action?: React.ReactNode
@@ -40,6 +44,16 @@ export function NativeChatAgentControls({
         <ArrowUp className="size-3.5" />
       </button>
       <NativeChatMessageTimestamp timestamp={timestamp} />
+      {turnUsage ? (
+        <>
+          {timestamp !== null ? (
+            <span aria-hidden="true" className="text-xs text-chat-foreground-faint/50">
+              ·
+            </span>
+          ) : null}
+          <NativeChatTurnUsageBadge usage={turnUsage} />
+        </>
+      ) : null}
     </div>
   )
 }

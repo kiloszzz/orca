@@ -162,9 +162,9 @@ export class AcpPromptTurns {
 export function acpTurnEndEvents(
   thread: string,
   turn: string,
-  { stopReason, at, durationMs, hookBlock }: AcpTurnEnding
+  { stopReason, at, durationMs, hookBlock, turnUsage }: AcpTurnEnding
 ): ProviderTimelineEvent[] {
-  const end = acpTurnEnd(turn, hookBlock ? 'end_turn' : stopReason, at, durationMs)
+  const end = acpTurnEnd(turn, hookBlock ? 'end_turn' : stopReason, at, durationMs, turnUsage)
   const body = hookBlock && hookOutcomeRowBody('blocked', [hookBlock.reason ?? ''])
   return body
     ? [{ type: 'item.update', item: `hook-block:${turn}`, body, join: { thread, turn } }, end]
@@ -175,7 +175,8 @@ export function acpTurnEnd(
   turn: string,
   stopReason: string,
   at: number,
-  durationMs?: number
+  durationMs?: number,
+  turnUsage?: AcpTurnEnding['turnUsage']
 ): ProviderTimelineEvent {
   return {
     type: 'turn.end',
@@ -189,6 +190,7 @@ export function acpTurnEnd(
         : ['refusal', 'max_tokens', 'max_turn_requests', 'error', 'rate_limit'].includes(stopReason)
           ? { outcome: 'failure' as const }
           : {}),
-    ...(durationMs === undefined ? {} : { durationMs })
+    ...(durationMs === undefined ? {} : { durationMs }),
+    ...(turnUsage ? { turnUsage } : {})
   }
 }

@@ -33,6 +33,7 @@ import type { AcpStructuredSessionAdapterDeps } from '../acp-structured-session-
 import { AcpStructuredTurns } from '../../turns/acp-structured-turns'
 import type { AcpStructuredTurnsDeps } from '../../turns/acp-turn-dispatch-contract'
 import { acpNoModelSelected } from '../../turns/acp-model-command'
+import { acpFallbackTurnUsageResolver } from '../../timeline/acp-turn-usage'
 import {
   assertAcpStartingSession,
   isAcpReadySession,
@@ -64,7 +65,7 @@ export async function initializeAcpStructuredSession(
   input: AcpHandshakeInput
 ): Promise<StructuredAgentSessionProviderOpenResult> {
   const { acquire, deps, launch, connection, options, prompts, child, onSettled } = input
-  const { spec } = launch
+  const { spec, cwd, env } = launch
   const sessionId = acquire.identity.sessionId
   const now = deps.now ?? Date.now
   const assertStarting = () => assertAcpStartingSession(child, input.abandoned)
@@ -84,12 +85,7 @@ export async function initializeAcpStructuredSession(
   }
   const sessionMeta = sessionMetaRefused ? undefined : launch.sessionMeta
   options.adoptInitialize(initialized)
-  const meta = await spec.resolveSessionMeta?.({
-    initialized,
-    cwd: launch.cwd,
-    env: launch.env,
-    signal: input.signal
-  })
+  const meta = await spec.resolveSessionMeta?.({ initialized, cwd, env, signal: input.signal })
   assertStarting()
   // Choose authentication using the execution host's launch environment.
   const authMethodId = spec.authMethod?.({
@@ -305,7 +301,8 @@ export async function initializeAcpStructuredSession(
       now,
       settle: onSettled,
       sessionLost: input.onSessionLost,
-      modelRefusal: (error) => acpNoModelSelected(spec.dialect, options, error)
+      modelRefusal: (error) => acpNoModelSelected(spec.dialect, options, error),
+      resolveFallbackTurnUsage: acpFallbackTurnUsageResolver(spec, started.sessionId, launch.env)
     })
   })
   if (!isAcpReadySession(child)) {

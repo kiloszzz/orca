@@ -1,5 +1,6 @@
 import { createCodexProviderActivityReader } from '../../../native-chat/agent-session-wire/providers/provider-frame-activity'
 import { recordCodexContextUsage } from './codex-context-usage'
+import { CodexTurnUsageTracker } from './codex-turn-usage'
 import { CODEX_TOKEN_USAGE_METHOD } from '../background-work/codex-subagent-activity'
 import {
   CODEX_JOURNAL_ADMITTED,
@@ -58,6 +59,7 @@ function createCodexTranslation(
       ? CODEX_JOURNAL_ADMITTED
       : { accepted: false, reason: 'backpressure' }
   let readActivity = createCodexProviderActivityReader()
+  const turnUsage = new CodexTurnUsageTracker()
   const resetActivity = (threadId: string): void => {
     if (threadId === (deps.primaryThreadId?.() ?? null)) {
       readActivity = createCodexProviderActivityReader()
@@ -181,6 +183,7 @@ function createCodexTranslation(
         items.activeItems.clear()
         prompts.pending.clear()
         turnBoundaries.clear()
+        turnUsage.clear()
         compactions.clear()
         goals.clear()
         return CODEX_JOURNAL_ADMITTED
@@ -211,7 +214,11 @@ function createCodexTranslation(
       }
       if (event.method === 'turn/started' || event.method === 'turn/completed') {
         if (event.method === 'turn/started') {
-          return turnBoundaries.start(event)
+          const admission = turnBoundaries.start(event)
+          if (admission.accepted && event.threadId === primaryThreadId) {
+            turnUsage.observeTurnStarted(event.threadId, readCodexTurnId(event.params))
+          }
+          return admission
         }
         const turnId = readCodexTurnId(event.params) ?? activeTurns.current(event.threadId)
         const failure = genericFrames.appendCompletionFailure(event.params, event.threadId, (id) =>
@@ -223,6 +230,7 @@ function createCodexTranslation(
         const admission = turnBoundaries.complete(event)
         if (admission.accepted && turnId) {
           genericFrames.forgetTurnFailure(event.threadId, turnId)
+          turnUsage.forgetTurn(event.threadId, turnId)
         }
         return admission
       }
@@ -239,14 +247,15 @@ function createCodexTranslation(
         event.method === CODEX_TOKEN_USAGE_METHOD &&
         event.threadId === (deps.primaryThreadId?.() ?? null)
       ) {
-        recordCodexContextUsage({
+        const usageInput = {
           sink: deps.sink,
           activeTurns,
           attributionFor,
           threadId: event.threadId,
-          params: event.params,
-          capturedAt: deps.now?.() ?? Date.now()
-        })
+          params: event.params
+        }
+        recordCodexContextUsage({ ...usageInput, capturedAt: deps.now?.() ?? Date.now() })
+        turnUsage.record(usageInput)
       }
       if (event.method === 'item/started' || event.method === 'item/completed') {
         const routed = routeThreadItem(event)
@@ -290,6 +299,7 @@ function createCodexTranslation(
       prompts.dispose()
       genericFrames.dispose()
       turnBoundaries.clear()
+      turnUsage.clear()
       compactions.clear()
       goals.dispose()
     }

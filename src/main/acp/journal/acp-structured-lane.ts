@@ -47,6 +47,7 @@ export type AcpStructuredLaneDeps = {
   onChildWorkFailure?: (error: unknown) => void
   now?: () => number
   childStops?: () => AcpChildStops
+  currentModelId?: () => string | null
 }
 
 export class AcpStructuredLane {
@@ -72,6 +73,7 @@ export class AcpStructuredLane {
       sessionId: deps.providerSessionId,
       dialect: deps.dialect,
       agentName: deps.agentName,
+      currentModelId: deps.currentModelId,
       onTextDropped: (drop) => this.reportTextDrop(drop)
     })
     this.assembler = createProviderTimelineAssembler({

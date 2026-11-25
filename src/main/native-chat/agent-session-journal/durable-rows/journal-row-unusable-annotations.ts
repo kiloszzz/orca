@@ -1,5 +1,6 @@
 import { isInputContext, isInputLineage } from '../input-order/journal-input-lineage'
 import { isAdmissibleAgentSessionContextUsage } from '../../../../shared/agent-session/conversation-context/agent-session-context-usage-schema'
+import { isAdmissibleAgentSessionTurnUsage } from '../../../../shared/agent-session/conversation-context/agent-session-turn-usage'
 
 export function dropUnusableRowAnnotations(record: Record<string, unknown>): void {
   if (record.inputOrderContext !== undefined && !isInputContext(record.inputOrderContext)) {
@@ -76,13 +77,16 @@ function dropUnusableContextUsage(record: Record<string, unknown>): void {
       : [])
   ]
   for (const body of bodies) {
-    if (
-      isPlainObject(body) &&
-      body.kind === 'turn' &&
-      body.contextUsage !== undefined &&
-      !isAdmissibleAgentSessionContextUsage(body.contextUsage)
-    ) {
-      delete body.contextUsage
+    if (isPlainObject(body) && body.kind === 'turn') {
+      if (
+        body.contextUsage !== undefined &&
+        !isAdmissibleAgentSessionContextUsage(body.contextUsage)
+      ) {
+        delete body.contextUsage
+      }
+      if (body.turnUsage !== undefined && !isAdmissibleAgentSessionTurnUsage(body.turnUsage)) {
+        delete body.turnUsage
+      }
     }
   }
 }

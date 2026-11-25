@@ -20923,6 +20923,23 @@
       },
       "automationSaved": {
         "openFullPage": "打开页面"
+      },
+      "turnUsage": {
+        "title": "本轮用量",
+        "ariaLabel": "本轮用量：{{total}} tokens",
+        "ariaLabelWithCache": "本轮用量：{{total}} tokens，缓存命中 {{rate}}",
+        "inlineTokens": "{{total}} tokens",
+        "inlineCache": "{{rate}} 缓存",
+        "totalTokens": "{{total}} tokens",
+        "cacheHitRate": "缓存命中率",
+        "cacheHitProgress": "缓存命中率 {{rate}}",
+        "cacheSummary": "已缓存 {{cached}} / 总输入 {{input}} tokens",
+        "cachedInput": "缓存读取",
+        "uncachedInput": "未命中输入",
+        "input": "输入",
+        "cacheWrite": "缓存写入",
+        "output": "输出",
+        "reasoning": "思考推理"
       }
     },
     "tab": {

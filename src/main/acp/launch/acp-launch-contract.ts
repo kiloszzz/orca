@@ -16,6 +16,7 @@ import type {
 import type { AcpSignInWatch } from '../process/acp-agent-connection'
 import type { AcpLaunchGate } from './acp-launch-gate'
 import type { AgentSessionAccountHome } from '../../../shared/agent-session/lifecycle/accounts/agent-session-account-home'
+import type { AgentSessionTurnUsage } from '../../../shared/agent-session/conversation-context/agent-session-turn-usage'
 import type { AgentSessionModelOption } from '../../../shared/agent-session/options/model-catalog/agent-session-model-option'
 import type { AcpModelDiscovery } from '../discovery/acp-model-discovery-policy'
 import type {
@@ -123,6 +124,11 @@ export type AcpLaunchSpec = {
   hostBackend?: AcpHostBackend
   /** Whether Orca's own copy of this program may run (and be kept updated); absent means it may. */
   managedCopyAllowed?(settings: ManagedCopySettings): boolean
+  /** Fallback per-turn usage lookup when an ACP server omits `PromptResponse.usage`. */
+  resolveFallbackTurnUsage?(input: {
+    providerSessionId: string
+    env: Readonly<Record<string, string>>
+  }): Promise<AgentSessionTurnUsage | undefined>
 }
 
 /** Reads on the host the agent runs on; a missing or unreadable file contributes none. */

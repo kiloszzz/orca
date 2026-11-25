@@ -31,22 +31,7 @@ function isSelect(option: SessionConfigOption): option is SelectOption {
 }
 
 export class AcpStructuredOptions {
-  constructor(
-    private readonly dialect: Pick<
-      AcpDialect,
-      | 'modelEfforts'
-      | 'familyEfforts'
-      | 'withheldCommands'
-      | 'chatModelIds'
-      | 'effortChangesModel'
-      | 'clampsUnlistedEffort'
-      | 'builtinCommands'
-      | 'skillDescription'
-      | 'fastConfigId'
-      | 'thinkingConfigId'
-      | 'interactionModes'
-    > = {}
-  ) {}
+  constructor(private readonly dialect: AcpDialect = {}) {}
 
   private forkSupport: AgentSessionOptionsResult['forkSupport'] = 'unknown'
   /** As the agent last reported them; replace through `adoptConfigOptions`. */
@@ -326,6 +311,17 @@ export class AcpStructuredOptions {
   // Match the mode category rather than assuming an agent's config ID.
   modeConfigId(): string {
     return this.select('mode')?.id ?? 'mode'
+  }
+
+  /** Active model id as last reported or applied on this session. */
+  currentModelId(): string | null {
+    return (
+      this.select('model')?.currentValue ??
+      this.models?.currentModelId ??
+      this.selectorProof?.model ??
+      this.appliedInput.get('model') ??
+      null
+    )
   }
 
   // Only the running values, so config notifications don't project the whole catalog again.

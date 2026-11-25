@@ -25,6 +25,7 @@ import { AcpChildSessions } from './acp-child-sessions'
 import { AcpTimelineOwnership } from './acp-timeline-ownership'
 import { AcpTurnFailures } from './acp-turn-failures'
 import { acpAuthenticationRequired, acpPromptErrorDetail } from '../turns/acp-prompt-failure'
+import { acpPromptResultEnding } from './acp-turn-usage'
 import type { AcpTextDrop } from './acp-turn-messages'
 import type { PromptResponse } from '../generated/acp-protocol.generated'
 import type { NativeChatSubagentState } from '../../../shared/native-chat/native-chat-types'
@@ -33,6 +34,7 @@ export type AcpTimelineTranslatorOptions = {
   sessionId: string
   dialect?: AcpDialect
   agentName?: string
+  currentModelId?: () => string | null
   onTextDropped?: (drop: AcpTextDrop) => void
 }
 
@@ -46,19 +48,19 @@ export class AcpTimelineTranslator {
   /** Drained by the lane in journal order. */
   readonly subagents = new AcpSubagents()
   readonly children: AcpChildSessions
-  private readonly ownership: AcpTimelineOwnership
+  private readonly ownership = new AcpTimelineOwnership()
   private readonly started = new BoundedMap<string, true>({ maxEntries: 128 })
   readonly elicitations = new AcpUrlElicitations()
   readonly failures: AcpTurnFailures
   private loading = false
-  private readonly context = new AcpContextTimeline()
+  private readonly context: AcpContextTimeline
   private readonly threadGoal = new AcpThreadGoalTimeline()
   protected activeTurn?: string
   private readonly agentTurns: AcpAgentTurns
 
   constructor(private readonly options: AcpTimelineTranslatorOptions) {
-    this.ownership = new AcpTimelineOwnership()
     this.dialect = options.dialect ?? GENERIC_ACP_DIALECT
+    this.context = new AcpContextTimeline(this.dialect, options.currentModelId)
     this.providerSessionId = options.sessionId
     this.injectsPromptIdentity = this.dialect.injectedPromptIdentity === true
     this.failures = new AcpTurnFailures(options.sessionId, this.dialect, options.agentName)
@@ -111,9 +113,10 @@ export class AcpTimelineTranslator {
     at: number,
     cancelRequested = false
   ): ProviderTimelineEvent[] {
-    const { stopReason, _meta } = result
-    const ending = { stopReason, at, hookBlock: this.dialect.hookBlock?.(_meta), cancelRequested }
-    return this.finishPrompt(clientMessageId, ending)
+    return this.finishPrompt(
+      clientMessageId,
+      acpPromptResultEnding(result, at, cancelRequested, this.dialect)
+    )
   }
 
   /** Only agent-authored failures supply diagnostic text; connection loss is handled separately. */
@@ -154,27 +157,22 @@ export class AcpTimelineTranslator {
     this.loading = true
   }
 
-  finishLoad(): void {
+  finishLoad = (): void => {
     this.loading = false
   }
 
-  reconcileSubagent(
+  reconcileSubagent = (
     id: string,
     state: NativeChatSubagentState,
     at: number
-  ): ProviderTimelineEvent[] {
-    return this.subagents.reconcile(id, state, this.options.sessionId, at)
-  }
+  ): ProviderTimelineEvent[] => this.subagents.reconcile(id, state, this.options.sessionId, at)
 
   /** Provisionally settle missing tasks; later provider endings may revise the outcome. */
-  reconcileBackgroundTask(taskId: string): ProviderTimelineEvent[] {
-    return this.backgroundTasks.reconcile(taskId, this.options.sessionId)
-  }
+  reconcileBackgroundTask = (taskId: string): ProviderTimelineEvent[] =>
+    this.backgroundTasks.reconcile(taskId, this.options.sessionId)
 
-  sessionEvent(event: AcpSessionEvent, at: number): ProviderTimelineEvent[] {
-    const params = event.kind === 'known' ? event.notification : event.raw
-    return this.notification('session/update', params, at)
-  }
+  sessionEvent = (event: AcpSessionEvent, at: number): ProviderTimelineEvent[] =>
+    this.notification('session/update', event.kind === 'known' ? event.notification : event.raw, at)
 
   notification(method: string, params: unknown, at: number): ProviderTimelineEvent[] {
     if (this.ownership.disposed) {
@@ -265,6 +263,7 @@ export class AcpTimelineTranslator {
         ...acpSessionUpdate(standard, turn, at, {
           tools: this.ownership.tools,
           dialect: this.dialect,
+          contextUsage: this.context,
           backgroundTasks: this.backgroundTasks,
           subagents: this.subagents,
           failures: this.failures,

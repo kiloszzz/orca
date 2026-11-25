@@ -132,7 +132,8 @@ export function decideTurnEnd(
     state: event.state,
     completedAt: event.at,
     ...(event.outcome !== undefined ? { outcome: event.outcome } : {}),
-    ...(event.durationMs !== undefined ? { durationMs: event.durationMs } : {})
+    ...(event.durationMs !== undefined ? { durationMs: event.durationMs } : {}),
+    ...(event.turnUsage !== undefined ? { turnUsage: event.turnUsage } : {})
   }
   return {
     ends: { turnItemId: turn.itemId, current: !state.open || state.open.itemId === turn.itemId },
@@ -239,6 +240,25 @@ export function decideContextUsage(
     named === undefined ? (state.open ?? state.latest) : input.context.rows.turn(providerKey(named))
   const target = turn ? { identity: turn.identity } : ({ newest: true } as const)
   const write = { contextUsage: event.usage }
+  const usage: ProviderTimelineItemWrite = {
+    reservedBytes: agentJournalTurnRowReservedBytes(target, write),
+    lifecycle: true,
+    options: { turnScope: AGENT_JOURNAL_THREAD_SCOPE },
+    resolution: { kind: 'turn-row', target, write }
+  }
+  return { writes: [usage] }
+}
+
+export function decideTurnUsage(
+  input: ProviderTimelineDecisionInput,
+  event: Extract<ProviderTimelineDecidedEvent, { type: 'turn.usage' }>
+): ProviderTimelineDecision {
+  const { state } = input
+  const named = event.join?.turn
+  const turn: ProviderTimelineTurnRef | null =
+    named === undefined ? (state.open ?? state.latest) : input.context.rows.turn(providerKey(named))
+  const target = turn ? { identity: turn.identity } : ({ newest: true } as const)
+  const write = { turnUsage: event.usage }
   const usage: ProviderTimelineItemWrite = {
     reservedBytes: agentJournalTurnRowReservedBytes(target, write),
     lifecycle: true,

@@ -8,6 +8,7 @@ import type { JournalLatestStop } from './context-epochs/journal-stop-turn-end'
 import { personStopDecidesTurn, turnEndAfterStop } from './context-epochs/journal-stop-turn-end'
 import { boundRunningToolOutput } from './item-lifecycle/journal-payload-bounds'
 import { isAdmissibleAgentSessionContextUsage } from '../../../shared/agent-session/conversation-context/agent-session-context-usage-schema'
+import { isAdmissibleAgentSessionTurnUsage } from '../../../shared/agent-session/conversation-context/agent-session-turn-usage'
 
 export function journalDomainLatestStop(
   db: Database.Database,
@@ -60,6 +61,14 @@ export function normalizeJournalDomainItemBody(
     !isAdmissibleAgentSessionContextUsage(body.contextUsage)
   ) {
     const { contextUsage: _unusable, ...usable } = body
+    body = usable
+  }
+  if (
+    body.kind === 'turn' &&
+    body.turnUsage !== undefined &&
+    !isAdmissibleAgentSessionTurnUsage(body.turnUsage)
+  ) {
+    const { turnUsage: _unusableTurnUsage, ...usable } = body
     body = usable
   }
   if (body.kind === 'turn' && body.state === 'interrupted' && body.outcome === undefined) {

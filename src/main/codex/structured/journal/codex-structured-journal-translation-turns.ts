@@ -18,8 +18,8 @@ import { estimateStructuredAgentSessionItemBytes } from '../../../native-chat/ag
 
 const ADMITTED: StructuredAgentSessionSinkAdmission = { accepted: true }
 
-/** Reserve for Codex's context report; the larger shared bound would overrun history restores. */
-export const CODEX_TURN_ROW_KEPT_BYTES = 1_024
+/** Reserve for Codex's context and turn-usage reports; the larger shared bound would overrun history restores. */
+export const CODEX_TURN_ROW_KEPT_BYTES = 1_280
 
 function codexTurnRowReservedBytes(
   identity: AgentJournalItemIdentity,

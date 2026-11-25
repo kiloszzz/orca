@@ -1,6 +1,7 @@
 // Shared turn status/copy for desktop translations and direct mobile rendering; platforms own their clocks.
 
 import type { AgentTurnOutcome } from '../../../agent-status/lifecycle/agent-turn-outcome'
+import type { AgentSessionTurnUsage } from '../../../agent-session/conversation-context/agent-session-turn-usage'
 
 export const NATIVE_CHAT_TURN_STATUS_COPY = {
   thinking: 'Thinking',
@@ -142,6 +143,8 @@ export type NativeChatTurnStatus = {
   workedSeconds: number | null
   /** How a settled turn ended, when the host recorded it. */
   verdict?: AgentTurnOutcome
+  /** Aggregate per-turn token and cache usage, when reported. */
+  turnUsage?: AgentSessionTurnUsage
 }
 
 export type NativeChatTurnTimingByTurn = Readonly<Record<string, NativeChatTurnTiming>>
@@ -224,6 +227,7 @@ export type NativeChatSettledTurn = {
   startedAt: number
   workedSeconds: number
   verdict?: AgentTurnOutcome
+  turnUsage?: AgentSessionTurnUsage
 }
 
 /** Host duration or explicit null (running/unobserved end) overrides local timing; absent entries permit local fallback. */
@@ -264,7 +268,8 @@ export function selectNativeChatTurnStatuses(
       startedAt: settled.startedAt,
       thinking: false,
       workedSeconds: settled.workedSeconds,
-      ...(settled.verdict ? { verdict: settled.verdict } : {})
+      ...(settled.verdict ? { verdict: settled.verdict } : {}),
+      ...(settled.turnUsage ? { turnUsage: settled.turnUsage } : {})
     }
   }
   const activeTiming = timingByTurn[activeTurnKey]

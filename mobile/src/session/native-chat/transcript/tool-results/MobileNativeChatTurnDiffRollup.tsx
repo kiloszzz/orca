@@ -80,17 +80,33 @@ export function MobileNativeChatTurnDiffRollup({
 }): React.JSX.Element {
   useMobileColorScheme()
   const t = useMobileTranslation()
+  const firstMessageId = diff.files[0]?.edits[0]?.target.messageId
+  const [cardOpen, setCardOpen] = useMobileNativeChatDisclosure(
+    `turn-diff-card-open:${firstMessageId}`,
+    true
+  )
   const [showAll, setShowAll] = useMobileNativeChatDisclosure(
-    `turn-diff-files:${diff.files[0]?.edits[0]?.target.messageId}`,
+    `turn-diff-files:${firstMessageId}`,
     false
   )
+  const hasOverflow = diff.files.length > NATIVE_CHAT_TURN_DIFF_FILE_LIMIT
   const files = showAll ? diff.files : diff.files.slice(0, NATIVE_CHAT_TURN_DIFF_FILE_LIMIT)
   const remaining = diff.files.length - files.length
   const type = toolType(fontScale)
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <Text style={[styles.label, type.meta]}>
+      <Pressable
+        style={({ pressed }) => [styles.header, pressed && pressedStyle]}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: cardOpen }}
+        onPress={() => setCardOpen(!cardOpen)}
+      >
+        <ChevronRight
+          size={14 * fontScale}
+          color={colors.textMuted}
+          style={cardOpen ? styles.open : undefined}
+        />
+        <Text style={[styles.headerTitle, type.meta]}>
           {t('components.native-chat.turnDiff.changedFiles', '{{count}} changed files', {
             count: diff.files.length,
             defaultValue_one: '{{count}} changed file'
@@ -103,22 +119,44 @@ export function MobileNativeChatTurnDiffRollup({
             {t('components.native-chat.turnDiff.partial', 'Partial diff')}
           </Text>
         ) : null}
-      </View>
-      {files.map((file) => (
-        <FileRow key={file.path} file={file} fontScale={fontScale} />
-      ))}
-      {remaining > 0 ? (
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.file, pressed && pressedStyle]}
-          onPress={() => setShowAll(true)}
-        >
-          <Text style={[styles.label, type.meta]}>
-            {t('components.native-chat.turnDiff.showMoreFiles', 'Show {{count}} more', {
-              count: remaining
-            })}
-          </Text>
-        </Pressable>
+      </Pressable>
+      {cardOpen ? (
+        <>
+          {files.map((file) => (
+            <FileRow key={file.path} file={file} fontScale={fontScale} />
+          ))}
+          {hasOverflow ? (
+            <View style={styles.overflowActions}>
+              <Pressable
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.file, pressed && pressedStyle]}
+                onPress={() => setShowAll(!showAll)}
+              >
+                <Text style={[styles.label, type.meta]}>
+                  {showAll
+                    ? t('chat.nativeChatUserMessageFold.showLess', 'Show less')
+                    : t('components.native-chat.turnDiff.showMoreFiles', 'Show {{count}} more', {
+                        count: remaining
+                      })}
+                </Text>
+              </Pressable>
+              {showAll ? (
+                <Pressable
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.file, pressed && pressedStyle]}
+                  onPress={() => {
+                    setShowAll(false)
+                    setCardOpen(false)
+                  }}
+                >
+                  <Text style={[styles.label, type.meta]}>
+                    {t('session.nativeChatCardHeaderAction.collapse', 'Collapse')}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
+        </>
       ) : null}
     </View>
   )
@@ -134,7 +172,19 @@ const styles = themedStyleSheet(() => ({
     marginHorizontal: spacing.lg,
     gap: spacing.xs
   },
-  header: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing.sm },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    paddingVertical: 2
+  },
+  headerTitle: { color: colors.textPrimary },
+  overflowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md
+  },
   file: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -198,7 +198,7 @@ export function useMobileNativeChatTurnDisclosure({
       },
     [expandedReasoning, line]
   )
-  const { fold, trailingRunIndex, workRuns, activityJoins } = useMobileNativeChatTranscriptRows({
+  const transcript = useMobileNativeChatTranscriptRows({
     enabled,
     rows,
     turnKeys,
@@ -210,8 +210,8 @@ export function useMobileNativeChatTurnDisclosure({
     turnBars: { bars, quiet, active, activeTurnKey }
   })
   const presentation = useMemo(
-    () => ({ rows, workRuns, turnKeys, receipts }),
-    [rows, workRuns, turnKeys, receipts]
+    () => ({ rows, workRuns: transcript.workRuns, turnKeys, receipts }),
+    [rows, transcript.workRuns, turnKeys, receipts]
   )
   const latestAssistantId = useMemo(
     () => waiting.listMessages.findLast((row) => row.role === 'assistant')?.id ?? null,
@@ -228,8 +228,10 @@ export function useMobileNativeChatTurnDisclosure({
             ? active
             : (completedByTurn[turnKey] ?? null)
           : null
+      const { fold, trailingRunIndex, workRuns, activityJoins, turnUsageByRowId } = transcript
       return {
         turnDiff: summaries.get(message.id),
+        turnUsage: turnUsageByRowId.get(message.id),
         turnStatus,
         ...(bar?.above === true && turnStatus !== null ? { turnStatusAbove: true } : {}),
         turnExpanded: turnKey ? expandedTurnIds.has(turnKey) : false,
@@ -279,10 +281,7 @@ export function useMobileNativeChatTurnDisclosure({
       completedByTurn,
       expandedTurnIds,
       inLiveWorkingTurn,
-      trailingRunIndex,
-      workRuns,
-      activityJoins,
-      fold,
+      transcript,
       rows,
       latestAssistantId,
       lineYields,

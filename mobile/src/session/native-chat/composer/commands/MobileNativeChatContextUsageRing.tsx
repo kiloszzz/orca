@@ -23,6 +23,7 @@ import {
 import { useDetailCardScope } from '../../../../components/detail-cards/use-detail-card-scope'
 import {
   COMPOSER_CONTROL_HIT_SLOP,
+  COMPOSER_CONTROL_SIZE,
   composerInputStyles as inputStyles
 } from '../../../../components/composer-input/composer-input-styles'
 import { useKeyboardPersistingTaps } from '../../../../platform/keyboard/keyboard-persisting-taps'
@@ -124,11 +125,11 @@ const MobileNativeChatContextUsageRing = memo(function MobileNativeChatContextUs
     },
     [layerRef, cardKeepsKeyboard]
   )
-  const { filled, critical, used, window } = contextUsageRingReadout(usage)
+  const { filled, warning, critical, used, window } = contextUsageRingReadout(usage)
   const rows = keyContextUsageRows(usage.rows)
   const counted = rows.filter(({ row }) => !row.deferred)
   const deferred = rows.filter(({ row }) => row.deferred)
-  const tint = critical ? colors.statusRed : colors.textMuted
+  const tint = critical ? colors.statusRed : warning ? colors.statusAmber : colors.textMuted
   const label = t(
     'chat.contextUsage.label',
     'Context {{used}} of {{window}} tokens, {{percent}}% used',
@@ -143,7 +144,7 @@ const MobileNativeChatContextUsageRing = memo(function MobileNativeChatContextUs
         accessibilityLabel={label}
         aria-expanded={card.requestedOpen}
         testID="native-chat-context-usage"
-        style={({ pressed }) => [inputStyles.ghostButton, pressed && inputStyles.pressed]}
+        style={({ pressed }) => [styles.trigger, pressed && inputStyles.pressed]}
         onLayout={card.onAnchorLayout}
         onPress={card.toggle}
         hitSlop={COMPOSER_CONTROL_HIT_SLOP}
@@ -176,6 +177,17 @@ const MobileNativeChatContextUsageRing = memo(function MobileNativeChatContextUs
             strokeDashoffset={RING_CIRCUMFERENCE * (1 - filled / 100)}
           />
         </Svg>
+        <Text
+          style={[
+            styles.readout,
+            warning && styles.readoutWarning,
+            critical && styles.readoutCritical
+          ]}
+          numberOfLines={1}
+          accessible={false}
+        >
+          {`${usage.percentage}% · ${used}`}
+        </Text>
       </Pressable>
       <DetailCardFocusBoundary refs={card.boundaryRefs} index={1} active={card.active} />
       <AnchoredDetailCardLayer
@@ -186,7 +198,14 @@ const MobileNativeChatContextUsageRing = memo(function MobileNativeChatContextUs
         titleTrailing={`${used}/${window}`}
       >
         <View style={styles.track}>
-          <View style={[styles.fill, critical && styles.fillCritical, { width: `${filled}%` }]} />
+          <View
+            style={[
+              styles.fill,
+              warning && styles.fillWarning,
+              critical && styles.fillCritical,
+              { width: `${filled}%` }
+            ]}
+          />
         </View>
         {counted.length > 0 ? (
           <View style={styles.rows}>{counted.map(renderContextUsageRow)}</View>
@@ -234,6 +253,23 @@ const ringStyles = StyleSheet.create({
 })
 
 const styles = themedStyleSheet(() => ({
+  trigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    height: COMPOSER_CONTROL_SIZE,
+    minWidth: COMPOSER_CONTROL_SIZE,
+    paddingHorizontal: spacing.xs,
+    borderRadius: radii.pill
+  },
+  readout: {
+    color: colors.textMuted,
+    fontSize: typography.metaSize,
+    fontVariant: ['tabular-nums']
+  },
+  readoutWarning: { color: colors.statusAmber },
+  readoutCritical: { color: colors.statusRed },
   track: {
     height: 6,
     marginTop: spacing.sm,
@@ -241,14 +277,9 @@ const styles = themedStyleSheet(() => ({
     backgroundColor: colors.translucentFill,
     overflow: 'hidden'
   },
-  fill: {
-    height: '100%',
-    borderRadius: radii.pill,
-    backgroundColor: colors.textPrimary
-  },
-  fillCritical: {
-    backgroundColor: colors.statusRed
-  },
+  fill: { height: '100%', borderRadius: radii.pill, backgroundColor: colors.textPrimary },
+  fillWarning: { backgroundColor: colors.statusAmber },
+  fillCritical: { backgroundColor: colors.statusRed },
   rows: {
     marginTop: spacing.md,
     gap: spacing.xs

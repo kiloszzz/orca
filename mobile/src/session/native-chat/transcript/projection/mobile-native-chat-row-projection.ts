@@ -62,6 +62,9 @@ export function equalMobileNativeChatRowContent(
     if (key === 'turnStatus') {
       return !!a.turnStatus && !!b.turnStatus && sameFields(a.turnStatus, b.turnStatus)
     }
+    if (key === 'turnUsage') {
+      return !!a.turnUsage && !!b.turnUsage && sameFields(a.turnUsage, b.turnUsage)
+    }
     if (key === 'source' && a.source && b.source) {
       return sameFields(a.source, b.source, (field, left, right) =>
         field === 'details'

@@ -28,7 +28,8 @@ export const styles = themedStyleSheet(() => ({
     backgroundColor: colors.chatUserSurface,
     borderWidth: 1,
     borderColor: colors.chatUserBorder,
-    borderRadius: radii.surface,
+    borderRadius: 18,
+    borderBottomRightRadius: 4,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm
   },
@@ -73,8 +74,14 @@ export const styles = themedStyleSheet(() => ({
   // Same gap as the tool rows' icon and sentence, between the time and its actions.
   meta: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 6
+  },
+  metaDot: {
+    color: colors.textMuted,
+    fontSize: typography.metaSize,
+    opacity: 0.5
   },
   // Copy and rewind sit together after the time; each 24 pt box centres a 14 pt glyph, so pulling 5 pt back on
   // both ends keeps the time-to-glyph gap at the meta gap and ends a user row's icons on the bubble's edge.

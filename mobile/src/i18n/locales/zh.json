@@ -1669,6 +1669,23 @@
         "partial": "部分差异",
         "showMoreFiles": "再显示 {{count}} 个"
       },
+      "turnUsage": {
+        "title": "本轮用量",
+        "ariaLabel": "本轮用量：{{total}} tokens",
+        "ariaLabelWithCache": "本轮用量：{{total}} tokens，缓存命中率 {{rate}}",
+        "inlineTokens": "{{total}} tokens",
+        "inlineCache": "{{rate}} 缓存",
+        "totalTokens": "{{total}} tokens",
+        "cacheHitRate": "缓存命中率",
+        "cacheHitProgress": "缓存命中率 {{rate}}",
+        "cacheSummary": "已缓存 {{cached}} / {{input}} 输入 tokens",
+        "cachedInput": "缓存命中输入",
+        "uncachedInput": "未命中输入",
+        "input": "输入",
+        "cacheWrite": "缓存写入",
+        "output": "输出",
+        "reasoning": "思考"
+      },
       "composer": {
         "planMode": "计划",
         "exitPlanMode": "退出计划模式",

@@ -1,10 +1,12 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
+import type { AgentSessionTurnUsage } from '../../../../../../src/shared/agent-session/conversation-context/agent-session-turn-usage'
 import type { AgentSessionRewindSurface } from '../../../../../../src/shared/agent-session/lifecycle/rewind/agent-session-rewind-request'
 import type { NativeChatMessage } from '../../../../../../src/shared/native-chat/native-chat-types'
 import { triggerMediumImpact } from '../../../../platform/haptics/haptics'
 import { MobileImageViewer } from '../../../../files/media/presentation/MobileImageViewer'
 import { MobileImageViewerActions } from '../../visual/MobileImageViewerActions'
 import { MobileNativeChatMessageActionsSheet } from './MobileNativeChatMessageActionsSheet'
+import { MobileNativeChatTurnUsageSheet } from '../../usage/MobileNativeChatTurnUsageSheet'
 import { MobileLinkActionSheet } from '../../../../browser/link-open/MobileLinkActionSheet'
 import { openMobileWebLink } from '../../../../browser/link-open/mobile-web-link-open'
 import type { MobileLinkOpenMode } from '../../../../storage/preferences'
@@ -45,6 +47,7 @@ export function MobileNativeChatRowOverlaysHost({
     image?: MobileNativeChatViewedImage
     actionsFor?: NativeChatMessage
     link?: string
+    turnUsage?: AgentSessionTurnUsage
   }>(conversation)
   const overlays = useMemo(
     () => ({
@@ -54,6 +57,7 @@ export function MobileNativeChatRowOverlaysHost({
         setShown({ actionsFor })
       },
       openRewind,
+      openTurnUsage: (turnUsage: AgentSessionTurnUsage) => setShown({ turnUsage }),
       imageSource
     }),
     [setShown, openRewind, imageSource]
@@ -81,6 +85,8 @@ export function MobileNativeChatRowOverlaysHost({
       <MobileNativeChatMessageActionsSheet message={shown.actionsFor} onClose={close} />
     ) : shown?.link ? (
       <MobileLinkActionSheet url={shown.link} onClose={close} openInOrca={onOpenUrlInOrca} />
+    ) : shown?.turnUsage ? (
+      <MobileNativeChatTurnUsageSheet usage={shown.turnUsage} onClose={close} />
     ) : null
   }, [shown, setShown, onOpenUrlInOrca])
   return (

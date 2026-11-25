@@ -1,10 +1,12 @@
 import { useMemo } from 'react'
+import type { AgentSessionTurnUsage } from '../../../../../../src/shared/agent-session/conversation-context/agent-session-turn-usage'
 import {
   nativeChatActivityRowJoins,
   type NativeChatActivityJoin
 } from '../../../../../../src/shared/native-chat/transcript/events/native-chat-activity-rows'
 import type { NativeChatResolvedPrompt } from '../../../../../../src/shared/native-chat/input/questions/native-chat-resolution-receipt'
 import { deriveNativeChatRowContent } from '../../../../../../src/shared/native-chat/transcript/row-content/native-chat-row-content'
+import { nativeChatMessageCopyText } from '../../../../../../src/shared/native-chat/transcript/messages/native-chat-message-copy-text'
 import {
   NATIVE_CHAT_EMPTY_TURN_FOLD,
   nativeChatTurnFold,
@@ -16,7 +18,10 @@ import {
   nativeChatRowSpeaksOrActs
 } from '../../../../../../src/shared/native-chat/transcript/folding/native-chat-trailing-run'
 import type { NativeChatTurnStatus } from '../../../../../../src/shared/native-chat/transcript/turns/native-chat-turn-status'
-import type { NativeChatMessage } from '../../../../../../src/shared/native-chat/native-chat-types'
+import {
+  isImageRefBlock,
+  type NativeChatMessage
+} from '../../../../../../src/shared/native-chat/native-chat-types'
 import {
   nativeChatWorkRunMember,
   nativeChatWorkRunSpans
@@ -117,6 +122,55 @@ const NO_TURN_BARS: MobileNativeChatTurnBars = {
 }
 const NO_RECEIPTS: ReadonlyMap<string, NativeChatResolvedPrompt> = new Map()
 const NO_WORK_RUNS: MobileNativeChatWorkRuns = { heads: new Map(), joined: new Set() }
+const NO_TURN_USAGE: ReadonlyMap<string, AgentSessionTurnUsage> = new Map()
+
+/** Attach each settled turn's aggregate token usage to its trailing assistant response row, matching desktop. */
+function mobileNativeChatTurnUsageByRow({
+  rows,
+  turnKeys,
+  completedByTurn,
+  fold,
+  workRuns,
+  quietIds
+}: {
+  rows: readonly NativeChatMessage[]
+  turnKeys: readonly (string | undefined)[]
+  completedByTurn: Readonly<Record<string, NativeChatTurnStatus>>
+  fold: NativeChatTurnFold
+  workRuns: MobileNativeChatWorkRuns
+  quietIds: ReadonlySet<string> | undefined
+}): ReadonlyMap<string, AgentSessionTurnUsage> {
+  const lastWordsByTurn = new Map<string, string>()
+  const lastImageByTurn = new Map<string, string>()
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index]
+    const turnKey = turnKeys[index]
+    if (
+      !row ||
+      !turnKey ||
+      row.role !== 'assistant' ||
+      row.agentStart ||
+      fold.foldedRows.has(index) ||
+      workRuns.joined.has(index) ||
+      quietIds?.has(row.id) === true
+    ) {
+      continue
+    }
+    if (nativeChatMessageCopyText(row).length > 0) {
+      lastWordsByTurn.set(turnKey, row.id)
+    } else if (row.blocks.some(isImageRefBlock)) {
+      lastImageByTurn.set(turnKey, row.id)
+    }
+  }
+  const usageByRowId = new Map<string, AgentSessionTurnUsage>()
+  for (const [turnKey, rowId] of new Map([...lastImageByTurn, ...lastWordsByTurn])) {
+    const usage = completedByTurn[turnKey]?.turnUsage
+    if (usage) {
+      usageByRowId.set(rowId, usage)
+    }
+  }
+  return usageByRowId.size > 0 ? usageByRowId : NO_TURN_USAGE
+}
 
 // Fold/frontier/work-run projection applies only to structured turn rows.
 export function useMobileNativeChatTranscriptRows({
@@ -145,6 +199,8 @@ export function useMobileNativeChatTranscriptRows({
   workRuns: MobileNativeChatWorkRuns
   /** Activity rows that touch another, past rows this projection hides. */
   activityJoins: ReadonlyMap<number, NativeChatActivityJoin>
+  /** Settled per-turn token usage keyed by the trailing assistant row id. */
+  turnUsageByRowId: ReadonlyMap<string, AgentSessionTurnUsage>
 } {
   const fold = useMemo(
     () =>
@@ -207,5 +263,22 @@ export function useMobileNativeChatTranscriptRows({
     turnDiffs,
     workRuns
   ])
-  return { fold, trailingRunIndex, workRuns, activityJoins }
+  const turnUsageByRowId = useMemo(
+    () =>
+      enabled
+        ? mobileNativeChatTurnUsageByRow({
+            rows,
+            turnKeys,
+            completedByTurn,
+            fold,
+            workRuns,
+            quietIds: quiet?.ids
+          })
+        : NO_TURN_USAGE,
+    [completedByTurn, enabled, fold, quiet, rows, turnKeys, workRuns]
+  )
+  return useMemo(
+    () => ({ fold, trailingRunIndex, workRuns, activityJoins, turnUsageByRowId }),
+    [fold, trailingRunIndex, workRuns, activityJoins, turnUsageByRowId]
+  )
 }

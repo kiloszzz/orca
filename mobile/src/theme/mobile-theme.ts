@@ -31,9 +31,9 @@ const darkColors = {
   inputBorder: '#737373',
   skillToken: '#8ab4f8',
   skillTokenSurface: 'rgba(59, 130, 246, 0.2)',
-  // Your own message: --chat-user-surface and --chat-user-border over --chat-canvas, text in --chat-foreground-strong.
-  chatUserSurface: '#262626',
-  chatUserBorder: 'rgba(250, 250, 250, 0.06)',
+  // Your own message: subtle blue-tinted bubble matching desktop's --chat-user-bubble-* tokens.
+  chatUserSurface: '#132035',
+  chatUserBorder: 'rgba(96, 165, 250, 0.32)',
   chatForegroundStrong: '#e3e3e3',
 
   // --foreground, --muted-foreground, --chat-foreground-faint
@@ -121,8 +121,8 @@ const lightColors: MobilePalette = {
   inputBorder: '#737373',
   skillToken: '#1d4ed8',
   skillTokenSurface: 'rgba(59, 130, 246, 0.12)',
-  chatUserSurface: '#f5f5f5',
-  chatUserBorder: 'rgba(10, 10, 10, 0.07)',
+  chatUserSurface: '#eaf2ff',
+  chatUserBorder: '#c5dcff',
   chatForegroundStrong: '#1e1e1e',
 
   textPrimary: '#0a0a0a',

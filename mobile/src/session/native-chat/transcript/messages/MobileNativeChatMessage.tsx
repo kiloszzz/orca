@@ -39,6 +39,7 @@ import { MobileNativeChatSubagentGroup } from './MobileNativeChatSubagentGroup'
 import { MobileNativeChatBackgroundTaskRun } from './MobileNativeChatBackgroundTaskRun'
 import { withoutBackgroundTaskRows } from '../../../../../../src/shared/native-chat/input/task-lists/native-chat-background-task-row'
 import { ToolRun } from '../tool-results/MobileNativeChatToolRun'
+import type { AgentSessionTurnUsage } from '../../../../../../src/shared/agent-session/conversation-context/agent-session-turn-usage'
 import type { NativeChatTurnStatus } from '../../../../../../src/shared/native-chat/transcript/turns/native-chat-turn-status'
 import { styles } from './mobile-native-chat-message-styles'
 import { MobileNativeChatAgentMessageCard } from '../agent-messages/MobileNativeChatAgentMessageCard'
@@ -60,6 +61,7 @@ function MobileNativeChatMessageImpl({
   previousUpdatePlan,
   fontScale = 1,
   turnStatus,
+  turnUsage,
   turnStatusAbove = false,
   turnExpanded,
   turnKey,
@@ -92,6 +94,7 @@ function MobileNativeChatMessageImpl({
   previousUpdatePlan?: Chat.NativeChatToolCallBlock
   fontScale?: number
   turnStatus?: NativeChatTurnStatus | null
+  turnUsage?: AgentSessionTurnUsage
   turnStatusAbove?: boolean
   turnExpanded?: boolean
   turnKey?: string
@@ -400,6 +403,7 @@ function MobileNativeChatMessageImpl({
             rowKey={rowKey ?? message.id}
             fontScale={fontScale}
             rewindable={rewindable}
+            turnUsage={turnUsage}
           />
         ) : null}
       </View>

@@ -1,3 +1,4 @@
+import type { AgentSessionTurnUsage } from '../../../../../../src/shared/agent-session/conversation-context/agent-session-turn-usage'
 import type {
   NativeChatMessage,
   NativeChatToolCallBlock
@@ -12,6 +13,7 @@ import type { NativeChatActivityJoin } from '../../../../../../src/shared/native
 
 export type MobileNativeChatTurnRow = {
   turnDiff?: NativeChatTurnDiff
+  turnUsage?: AgentSessionTurnUsage
   turnStatus: NativeChatTurnStatus | null
   turnStatusAbove?: boolean
   turnExpanded: boolean

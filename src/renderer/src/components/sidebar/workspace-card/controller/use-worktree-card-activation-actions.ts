@@ -15,6 +15,7 @@ import type { useWorktreeCardFoundation } from './use-worktree-card-foundation'
 import type { useWorktreeCardLinkedDetails } from '../details/use-worktree-card-linked-details'
 import { useAppStore } from '@/store'
 import { selectWorkspaceShowsUnread } from '../slots/worktree-card-slot-rollup'
+import { expandCollapsedWorktreeAgents } from '../activity/worktree-card-agents-expansion-state'
 
 type Foundation = ReturnType<typeof useWorktreeCardFoundation>
 type LinkedDetails = ReturnType<typeof useWorktreeCardLinkedDetails>
@@ -94,11 +95,10 @@ export function useWorktreeCardActivationActions({
         wasActive: isActive,
         sshDisconnected: isSshDisconnected
       })
+      const hostId = worktree.hostId ?? (repo ? getRepoExecutionHostId(repo) : undefined)
+      expandCollapsedWorktreeAgents(worktree.id, hostId)
       onImmediateActivate?.(worktree.id, activationRowKey)
-      void activateWorktreeFromSidebar(
-        worktree.id,
-        worktree.hostId ?? (repo ? getRepoExecutionHostId(repo) : undefined)
-      )
+      void activateWorktreeFromSidebar(worktree.id, hostId)
       onActivate?.()
     },
     [

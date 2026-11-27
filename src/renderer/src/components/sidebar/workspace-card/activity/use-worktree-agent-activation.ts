@@ -15,6 +15,7 @@ import { getPtyExecutionHost } from '../../../../../../shared/terminal/pty/lifec
 import { dismissStaleAgentRowByKey } from '../../../terminal-pane/agent-status/stale-agent-row'
 import { activateStructuredAgentSessionTab } from '@/lib/agent-session/structured-agent-session-tab-activation'
 import { isExecutionHostForWorktree } from '@/lib/workspace/ownership/qualified-worktree-execution-owner'
+import { withSuspendedOnScreenAttentionScan } from '@/attention/on-screen-attention-scan'
 
 export function useWorktreeAgentActivation(worktreeId: string, executionHostId?: ExecutionHostId) {
   return useCallback(
@@ -53,14 +54,16 @@ export function activateWorktreeAgentPane(
     ) {
       return
     }
-    if (
-      activateAndRevealWorkspace(worktreeId, {
-        ...options,
-        executionHostId: executionHostId ?? owner ?? undefined
-      }) !== false
-    ) {
-      activateStructuredAgentSessionTab({ worktreeId, tabId: nativeTab.id, target })
-    }
+    withSuspendedOnScreenAttentionScan(() => {
+      if (
+        activateAndRevealWorkspace(worktreeId, {
+          ...options,
+          executionHostId: executionHostId ?? owner ?? undefined
+        }) !== false
+      ) {
+        activateStructuredAgentSessionTab({ worktreeId, tabId: nativeTab.id, target })
+      }
+    })
     return
   }
   const parsed = parsePaneKey(paneKey)
@@ -89,25 +92,27 @@ export function activateWorktreeAgentPane(
   ) {
     return
   }
-  // Use shared activation for cross-repo reveal and navigation history.
-  if (activateAndRevealWorkspace(worktreeId, { ...options, executionHostId }) === false) {
-    return
-  }
-  const tabs = useAppStore.getState().tabsByWorktree[worktreeId] ?? []
-  if (tabs.some((t) => t.id === tabId)) {
-    activateTabAndFocusPane(tabId, parsed.leafId, {
-      ackPaneKeyOnSuccess: paneKey,
-      flashFocusedPane: true,
-      scrollToBottomIfOutputSinceLastView: true
-    })
-    activateTerminalTabOnOwner(worktreeId, tabId, parsed.leafId)
-  } else if (!activateStructuredAgentSessionTab({ worktreeId, tabId })) {
-    const liveEntry = useAppStore.getState().agentStatusByPaneKey.get(paneKey)
-    if (liveEntry?.worktreeId === worktreeId) {
-      // Live worker status can precede tab hydration; retain the row and activate its owning terminal.
-      activateTerminalTabOnOwner(worktreeId, tabId, parsed.leafId)
+  withSuspendedOnScreenAttentionScan(() => {
+    // Use shared activation for cross-repo reveal and navigation history.
+    if (activateAndRevealWorkspace(worktreeId, { ...options, executionHostId }) === false) {
       return
     }
-    dismissStaleAgentRowByKey(paneKey)
-  }
+    const tabs = useAppStore.getState().tabsByWorktree[worktreeId] ?? []
+    if (tabs.some((t) => t.id === tabId)) {
+      activateTabAndFocusPane(tabId, parsed.leafId, {
+        ackPaneKeyOnSuccess: paneKey,
+        flashFocusedPane: true,
+        scrollToBottomIfOutputSinceLastView: true
+      })
+      activateTerminalTabOnOwner(worktreeId, tabId, parsed.leafId)
+    } else if (!activateStructuredAgentSessionTab({ worktreeId, tabId })) {
+      const liveEntry = useAppStore.getState().agentStatusByPaneKey.get(paneKey)
+      if (liveEntry?.worktreeId === worktreeId) {
+        // Live worker status can precede tab hydration; retain the row and activate its owning terminal.
+        activateTerminalTabOnOwner(worktreeId, tabId, parsed.leafId)
+        return
+      }
+      dismissStaleAgentRowByKey(paneKey)
+    }
+  })
 }

@@ -148,7 +148,7 @@ export function activateAndRevealFolderWorkspaceWithOutcome(
       agent: opts?.agent
     })
   }
-  recordShownTabFocus(useAppStore.getState(), workspaceKey)
+  recordShownTabFocus(useAppStore.getState(), workspaceKey, !opts?.startup)
 
   return { opened: { primaryTabId } }
 }
@@ -291,7 +291,11 @@ export function activateAndRevealWorktreeWithOutcome(
       startup: opts?.startup,
       agent: opts?.agent
     })
-  recordShownTabFocus(useAppStore.getState(), worktreeId)
+  recordShownTabFocus(
+    useAppStore.getState(),
+    worktreeId,
+    !opts?.startup && !isPlainAlreadyActiveTerminal
+  )
 
   return { opened: { primaryTabId, ...(startupAccepted ? { startupAccepted } : {}) } }
 }

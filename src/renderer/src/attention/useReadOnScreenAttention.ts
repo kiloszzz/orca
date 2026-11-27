@@ -23,7 +23,12 @@ export function useReadOnScreenAttention(): void {
               subscribePresenceSignals: subscribeViewReportPresenceSignals,
               viewReporter: createClientWorkspaceViewReporter()
             }
-          : { subscribePresenceSignals: subscribeAutoAckPresenceSignals })
+          : {
+              subscribePresenceSignals: (onRescan, onInput) =>
+                subscribeAutoAckPresenceSignals(onRescan, onInput, {
+                  deferSidebarNavigationFocus: true
+                })
+            })
       }),
     []
   )

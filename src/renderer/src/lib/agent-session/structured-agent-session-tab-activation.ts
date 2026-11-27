@@ -10,6 +10,7 @@ import {
 } from '@/runtime/native-chat/session-ownership/structured-agent-session-owner'
 import { toRuntimeWorktreeSelector } from '@/runtime/rpc/targets/runtime-worktree-selector'
 import type { Tab } from '../../../../shared/workspace-layout/tab-groups/tab-types'
+import { withSuspendedOnScreenAttentionScan } from '@/attention/on-screen-attention-scan'
 
 export function findStructuredAgentSessionTab(
   unifiedTabsByWorktree: Readonly<Record<string, readonly Tab[]>>,
@@ -45,9 +46,11 @@ export function activateStructuredAgentSessionTab(args: {
   if (!tab) {
     return false
   }
-  state.focusGroup(args.worktreeId, tab.groupId)
-  state.activateTab(tab.id, { worktreeId: args.worktreeId })
-  state.setActiveTabType('agent-session', args.worktreeId)
+  withSuspendedOnScreenAttentionScan(() => {
+    state.focusGroup(args.worktreeId, tab.groupId)
+    state.activateTab(tab.id, { worktreeId: args.worktreeId })
+    state.setActiveTabType('agent-session', args.worktreeId)
+  })
   requestNativeChatComposerFocus(tab.id)
   activateStructuredAgentSessionTabOnOwner(args.worktreeId, tab.entityId, args.target)
   return true

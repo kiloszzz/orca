@@ -10,6 +10,7 @@ import {
   type StructuredSubjectRead
 } from '@/attention/agent-subject-read-actions'
 import {
+  clearPendingSidebarNavigationPress,
   createAutoAckPresenceCheck,
   isPresenceConfirmed,
   notePresence,
@@ -63,6 +64,25 @@ function hasMarkersOnScreen(s: AppState, targets: readonly AutoAckTabTarget[]): 
   )
 }
 
+let scanSuspendDepth = 0
+const suspendedRescanCallbacks = new Set<() => void>()
+
+/** Defer on-screen attention scans across multi-step workspace+tab activation so intermediate active tabs are never acknowledged. */
+export function withSuspendedOnScreenAttentionScan<T>(fn: () => T): T {
+  scanSuspendDepth += 1
+  try {
+    return fn()
+  } finally {
+    scanSuspendDepth -= 1
+    if (scanSuspendDepth === 0) {
+      clearPendingSidebarNavigationPress()
+      for (const rescan of suspendedRescanCallbacks) {
+        rescan()
+      }
+    }
+  }
+}
+
 /** Visible/focused/present users acknowledge every visible live target and unread flag. */
 export function startOnScreenAttentionScan(
   store: ScanStore,
@@ -103,6 +123,9 @@ export function startOnScreenAttentionScan(
     reads?: readonly AgentSubjectRead[]
     view?: StructuredSubjectRead
   }): void => {
+    if (scanSuspendDepth > 0) {
+      return
+    }
     const s = store.getState()
     // Why both edges: opening puts the floating tab on screen; closing moves the screen back.
     const floatingPanelVisible = selectFloatingWorkspacePanelVisible(s)
@@ -236,6 +259,8 @@ export function startOnScreenAttentionScan(
       .getState()
       .readOnScreenAttention({ workspaceIds, targets }, { screenArrived: arrived, markersRead })
   }
+  const rescanAfterSuspend = (): void => maybeAck()
+  suspendedRescanCallbacks.add(rescanAfterSuspend)
   // Why: run once on mount to catch a restored session that already has agents on the visible tab.
   maybeAck({ force: true })
   // Subscribe to all store changes; the ref-equality guard above skips unrelated updates.
@@ -254,6 +279,7 @@ export function startOnScreenAttentionScan(
     }
   )
   return () => {
+    suspendedRescanCallbacks.delete(rescanAfterSuspend)
     presence.dispose()
     unsubscribe()
     stopViews()

@@ -57,7 +57,6 @@ export function NativeChatAssistantMessageRow({
     trailingRun,
     continuesTurn = false,
     endsResponse,
-    latestResponse = true,
     turnUsage,
     actionsHang = false,
     runtimeContext,
@@ -140,9 +139,6 @@ export function NativeChatAssistantMessageRow({
           action={fork ? <NativeChatForkAction itemId={message.id} fork={fork} /> : null}
           className={cn(
             'w-fit select-none',
-            !latestResponse &&
-              fork?.pendingItemId !== message.id &&
-              'transition-opacity can-hover:pointer-events-none can-hover:opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100 has-[[data-state=open]]:pointer-events-auto has-[[data-state=open]]:opacity-100',
             // They hang into the gap below only above the next turn's opening row. Never in a
             // section, which keeps them inside its border.
             actionsHang && '-mb-1'

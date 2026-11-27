@@ -72,6 +72,8 @@ export type AppApi = {
   getKeyboardLayoutSnapshot: () => Promise<KeyboardLayoutSnapshot | null>
   /** Subscribes to active macOS input-source changes. No-op in the browser fallback. */
   onKeyboardLayoutChanged: (callback: (event: KeyboardLayoutChangeEvent) => void) => () => void
+  /** Updates macOS Dock badge and menu-bar unread count; tray attention only on Windows, no-op on Linux. */
+  setUnreadDockBadgeCount: (count: number) => Promise<void>
   getFloatingTerminalCwd: (args?: FloatingTerminalCwdRequest) => Promise<string>
   /** App-owned directory for auto-created Floating Workspace notes. */
   getFloatingMarkdownDirectory: () => Promise<string>

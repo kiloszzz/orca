@@ -2286,7 +2286,8 @@
       "body": "Orca is still running in the system tray"
     },
     "activityWaiting": "Orca - activity waiting",
-    "activityWaitingSuffix": "activity waiting"
+    "activityWaitingSuffix": "activity waiting",
+    "unreadSuffix": "unread"
   },
   "worktreeJumpPalette": {
     "goToWebsite": "Go to {{value0}}",

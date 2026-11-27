@@ -142,6 +142,20 @@ export function expandWorktreeAgentList(
   notifyExpansion(key)
 }
 
+/** Expand a workspace's collapsed inline AI session list when the user navigates into it. */
+export function expandCollapsedWorktreeAgents(
+  worktreeId: string,
+  executionHostId: ExecutionHostId | undefined
+): void {
+  const key = expansionKey(worktreeId, executionHostId)
+  const base = readExpansionState(key)
+  if (!base.agentsCollapsed) {
+    return
+  }
+  persistExpansionState(key, { ...base, agentsCollapsed: false })
+  notifyExpansion(key)
+}
+
 function notifyExpansion(key: HostScopedWorktreeKey): void {
   for (const listener of expansionListeners.get(key) ?? []) {
     listener()

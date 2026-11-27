@@ -57,26 +57,110 @@ export function createAutoAckPresenceCheck(
   }
 }
 
+const SIDEBAR_NAVIGATION_TARGET_SELECTOR =
+  '[data-workspace-agent-row], [data-worktree-card-surface]'
+const FOCUS_RESCAN_COALESCE_MS = 120
+const SIDEBAR_NAVIGATION_PRESS_TIMEOUT_MS = 600
+const SIDEBAR_NAVIGATION_RELEASE_SETTLE_MS = 50
+
+let sidebarNavigationPressPending = false
+let sidebarNavigationPressTimer: ReturnType<typeof setTimeout> | null = null
+let focusRescanTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearTimer(timer: ReturnType<typeof setTimeout> | null): null {
+  if (timer !== null) {
+    clearTimeout(timer)
+  }
+  return null
+}
+
+function isSidebarNavigationPointerTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(SIDEBAR_NAVIGATION_TARGET_SELECTOR) !== null
+}
+
+/** Clear pending sidebar press deferral once click-driven navigation finishes switching surfaces. */
+export function clearPendingSidebarNavigationPress(): void {
+  sidebarNavigationPressPending = false
+  sidebarNavigationPressTimer = clearTimer(sidebarNavigationPressTimer)
+  focusRescanTimer = clearTimer(focusRescanTimer)
+}
+
 export function subscribeAutoAckPresenceSignals(
   onRescan: () => void,
-  onInput: () => void
+  onInput: () => void,
+  options?: { deferSidebarNavigationFocus?: boolean }
 ): () => void {
+  const deferSidebarNavigation = options?.deferSidebarNavigationFocus === true
+  const onVisibilityChange = (): void => {
+    onRescan()
+  }
+  const onFocus = (): void => {
+    if (!deferSidebarNavigation) {
+      onRescan()
+      return
+    }
+    focusRescanTimer = clearTimer(focusRescanTimer)
+    focusRescanTimer = setTimeout(() => {
+      focusRescanTimer = null
+      if (!sidebarNavigationPressPending) {
+        onRescan()
+      }
+    }, FOCUS_RESCAN_COALESCE_MS)
+  }
+  const onPointerDown = (event: Event): void => {
+    if (!event.isTrusted) {
+      return
+    }
+    if (deferSidebarNavigation && isSidebarNavigationPointerTarget(event.target)) {
+      // Pressing a sidebar row/card is about to switch tabs; avoid acknowledging the old screen before click runs.
+      focusRescanTimer = clearTimer(focusRescanTimer)
+      sidebarNavigationPressPending = true
+      sidebarNavigationPressTimer = clearTimer(sidebarNavigationPressTimer)
+      sidebarNavigationPressTimer = setTimeout(() => {
+        sidebarNavigationPressTimer = null
+        sidebarNavigationPressPending = false
+        onRescan()
+      }, SIDEBAR_NAVIGATION_PRESS_TIMEOUT_MS)
+      return
+    }
+    focusRescanTimer = clearTimer(focusRescanTimer)
+    onInput()
+  }
+  const onPointerEnd = (): void => {
+    if (!deferSidebarNavigation || !sidebarNavigationPressPending) {
+      return
+    }
+    sidebarNavigationPressTimer = clearTimer(sidebarNavigationPressTimer)
+    sidebarNavigationPressTimer = setTimeout(() => {
+      sidebarNavigationPressTimer = null
+      if (sidebarNavigationPressPending) {
+        sidebarNavigationPressPending = false
+        onRescan()
+      }
+    }, SIDEBAR_NAVIGATION_RELEASE_SETTLE_MS)
+  }
   const input = (event: Event): void => {
     if (event.isTrusted) {
+      focusRescanTimer = clearTimer(focusRescanTimer)
       onInput()
     }
   }
-  document.addEventListener('visibilitychange', onRescan)
-  window.addEventListener('focus', onRescan)
-  window.addEventListener('pointerdown', input)
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('focus', onFocus)
+  window.addEventListener('pointerdown', onPointerDown)
+  window.addEventListener('pointerup', onPointerEnd)
+  window.addEventListener('pointercancel', onPointerEnd)
   window.addEventListener('pointermove', input)
   window.addEventListener('wheel', input, { passive: true })
   // Why capture: xterm stops the keydowns it handles before they bubble to the window.
   addAppKeyListener('keydown', input)
   return () => {
-    document.removeEventListener('visibilitychange', onRescan)
-    window.removeEventListener('focus', onRescan)
-    window.removeEventListener('pointerdown', input)
+    clearPendingSidebarNavigationPress()
+    document.removeEventListener('visibilitychange', onVisibilityChange)
+    window.removeEventListener('focus', onFocus)
+    window.removeEventListener('pointerdown', onPointerDown)
+    window.removeEventListener('pointerup', onPointerEnd)
+    window.removeEventListener('pointercancel', onPointerEnd)
     window.removeEventListener('pointermove', input)
     window.removeEventListener('wheel', input)
     removeAppKeyListener('keydown', input)

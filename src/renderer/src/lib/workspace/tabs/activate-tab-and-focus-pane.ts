@@ -2,6 +2,7 @@ import { useAppStore } from '@/store/index'
 import { resolveActiveTabOwnerWorktreeId } from '@/store/terminals/ownership/active-tab-owner-worktree'
 import { endSidebarListKeyboardNavigation } from '@/lib/text-input/focus/editable-focus-preservation'
 import { FOCUS_TERMINAL_PANE_EVENT, type FocusTerminalPaneDetail } from '@/constants/terminal'
+import { withSuspendedOnScreenAttentionScan } from '@/attention/on-screen-attention-scan'
 
 let pendingFocusPaneFrameId: number | null = null
 
@@ -24,12 +25,14 @@ export function activateTabAndFocusPane(
 ): void {
   const { setActiveTab, setActiveTabType, tabsByWorktree, activeWorktreeId } =
     useAppStore.getState()
-  // Reveal Terminal for tab-only activation, scoped to its owner so a late reveal cannot change another workspace’s surface.
-  setActiveTabType(
-    'terminal',
-    resolveActiveTabOwnerWorktreeId(tabsByWorktree, activeWorktreeId, tabId) ?? activeWorktreeId
-  )
-  setActiveTab(tabId)
+  withSuspendedOnScreenAttentionScan(() => {
+    // Reveal Terminal for tab-only activation, scoped to its owner so a late reveal cannot change another workspace’s surface.
+    setActiveTabType(
+      'terminal',
+      resolveActiveTabOwnerWorktreeId(tabsByWorktree, activeWorktreeId, tabId) ?? activeWorktreeId
+    )
+    setActiveTab(tabId)
+  })
   cancelPendingFocusPaneFrame()
   if (leafId === null) {
     return

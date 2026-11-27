@@ -131,7 +131,9 @@ export function subscribeViewReportPresenceSignals(
   onRescan: () => void,
   onInput: () => void
 ): () => void {
-  const stop = subscribeAutoAckPresenceSignals(onRescan, onInput)
+  const stop = subscribeAutoAckPresenceSignals(onRescan, onInput, {
+    deferSidebarNavigationFocus: true
+  })
   window.addEventListener('blur', onRescan)
   return () => {
     stop()

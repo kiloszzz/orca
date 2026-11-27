@@ -3,8 +3,12 @@ import { ORCA_SIDEBAR_INPUTS_IS_MAIN } from '../../../../../shared/sidebar-list/
 import type { AppState } from '@/store/types'
 import type { ActiveWorktreeStateTransition } from '@/store/slices/worktrees/session/worktree-selection-contract'
 import { stampWorktreeVisit } from '@/store/slices/worktrees/session/worktree-visit-recency'
+import { parseWorkspaceKey } from '../../../../../shared/workspace/identity/workspace-scope'
+import { getFolderWorkspaceHostId } from '../../../../../shared/folder-workspaces/folder-workspace-host-id'
+import { selectFolderWorkspaces } from '@/store/workspaces/catalog/workspace-record-fields'
 import { appendHistoryEntry } from '@/store/slices/ui/workspace-navigation-history'
 import { noteUserWorkspaceOpen } from './workspace-switch-user-act'
+import { expandCollapsedWorktreeAgents } from '@/components/sidebar/workspace-card/activity/worktree-card-agents-expansion-state'
 
 type PreviousActive = { worktreeId: string | null; hostId: ExecutionHostId | null }
 type VisitState = Pick<
@@ -123,11 +127,43 @@ export function buildActivationStateTransition(
   }
 }
 
+function resolveVisitedWorkspaceHostId(
+  state: Pick<
+    AppState,
+    'activeWorkspaceExecutionHostId' | 'getKnownWorktreeById' | 'projectGroups' | 'folderWorkspaces'
+  >,
+  workspaceKey: string
+): ExecutionHostId | undefined {
+  if (state.activeWorkspaceExecutionHostId) {
+    return state.activeWorkspaceExecutionHostId
+  }
+  const scope = parseWorkspaceKey(workspaceKey)
+  if (scope?.type === 'folder') {
+    const folder = selectFolderWorkspaces(state).find(
+      (entry) => entry.id === scope.folderWorkspaceId
+    )
+    return folder ? getFolderWorkspaceHostId(folder, state.projectGroups) : undefined
+  }
+  return state.getKnownWorktreeById(workspaceKey)?.hostId
+}
+
 /** A user visit focuses the tab it shows; automation run retention keeps a tab once focused. */
 export function recordShownTabFocus(
-  state: Pick<AppState, 'getActiveTab' | 'activateTab'>,
-  workspaceKey: string
+  state: Pick<
+    AppState,
+    | 'getActiveTab'
+    | 'activateTab'
+    | 'activeWorkspaceExecutionHostId'
+    | 'getKnownWorktreeById'
+    | 'projectGroups'
+    | 'folderWorkspaces'
+  >,
+  workspaceKey: string,
+  expandCollapsedAgents = false
 ): void {
+  if (expandCollapsedAgents) {
+    expandCollapsedWorktreeAgents(workspaceKey, resolveVisitedWorkspaceHostId(state, workspaceKey))
+  }
   const shown = state.getActiveTab(workspaceKey)
   if (shown) {
     state.activateTab(shown.id, { worktreeId: workspaceKey, preservePreview: true })

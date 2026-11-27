@@ -31,6 +31,7 @@ import {
   markdownDocumentFromFilePath
 } from '../../shared/file-listing/markdown-document-paths'
 import { registerMacSymbolicHotkeysProbeHandler } from './keyboard/macos-symbolic-hotkeys-probe'
+import { setUnreadDockBadgeCount } from '../dock/unread-badge'
 import { registerRendererShutdownCheckpointHandler } from './renderer-shutdown-checkpoint'
 import type { RendererShutdownCheckpointService } from '../core-desktop/renderer-shutdown-checkpoint-service'
 import { readMacKeyboardLayoutSnapshot } from './keyboard/macos-keyboard-layout-snapshot'
@@ -234,6 +235,10 @@ export function registerAppHandlers(store: Store, options: RegisterAppHandlersOp
   })
 
   registerMacSymbolicHotkeysProbeHandler(readCommandStdout)
+
+  ipcMain.handle('app:setUnreadDockBadgeCount', (_event, count: number) => {
+    setUnreadDockBadgeCount(Number.isFinite(count) ? count : 0)
+  })
 
   ipcMain.handle('app:getFloatingTerminalCwd', (_event, args?: FloatingTerminalCwdRequest) =>
     resolveFloatingTerminalCwd(store, args)

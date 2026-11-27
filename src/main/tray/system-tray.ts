@@ -36,6 +36,11 @@ let baseTrayImage: NativeImage | null = null
 
 // Remember attention before deferred tray creation so its first image is current.
 let attentionActive = false
+let unreadCount = 0
+
+function formatTrayUnreadTitle(count: number): string {
+  return count <= 0 ? '' : count > 99 ? '99+' : String(count)
+}
 
 // Keep dev identity across attention-triggered tooltip rebuilds.
 let devIndicator: { label: string | null } | null = null
@@ -58,8 +63,11 @@ function applyTrayImage(): void {
     return
   }
 
+  const showAttention = attentionActive || unreadCount > 0
+
   if (process.platform === 'darwin') {
-    if (attentionActive) {
+    tray.setTitle(formatTrayUnreadTitle(unreadCount), { fontType: 'monospacedDigit' })
+    if (showAttention) {
       try {
         // Disabling template tint enables amber attention but requires theme-appropriate literal glyph pixels.
         const useLightGlyph = nativeTheme.shouldUseDarkColors
@@ -79,9 +87,11 @@ function applyTrayImage(): void {
         attentionImage.setTemplateImage(false)
         tray.setImage(attentionImage)
         tray.setToolTip(
-          devIndicator
-            ? `${baseTooltip()} - ${translateMain('tray.activityWaitingSuffix', 'activity waiting')}`
-            : translateMain('tray.activityWaiting', 'Orca - activity waiting')
+          unreadCount > 0
+            ? `${baseTooltip()} - ${unreadCount} ${translateMain('tray.unreadSuffix', 'unread')}`
+            : devIndicator
+              ? `${baseTooltip()} - ${translateMain('tray.activityWaitingSuffix', 'activity waiting')}`
+              : translateMain('tray.activityWaiting', 'Orca - activity waiting')
         )
         return
       } catch (error) {
@@ -96,7 +106,7 @@ function applyTrayImage(): void {
     return
   }
 
-  tray.setImage(attentionActive ? composeTrayAttentionIcon(baseTrayImage) : baseTrayImage)
+  tray.setImage(showAttention ? composeTrayAttentionIcon(baseTrayImage) : baseTrayImage)
 }
 
 // Coalesce repaint bursts and read current state in the deferred turn so dropped schedules cannot apply stale icons.
@@ -169,7 +179,7 @@ function watchMacAppearance(): void {
     return
   }
   nativeThemeUpdatedListener = () => {
-    if (attentionActive) {
+    if (attentionActive || unreadCount > 0) {
       // Appearance callbacks originate inside AppKit; defer native writes.
       scheduleTrayImage()
     }
@@ -311,6 +321,16 @@ export function setTrayAttention(active: boolean): void {
   }
   // Set dedup state synchronously; defer only native scene writes or rapid show/hide races mis-dedupe.
   attentionActive = active
+  scheduleTrayImage()
+}
+
+/** Sync live unread count to macOS menu-bar title and tray attention dot. */
+export function setTrayUnreadCount(count: number): void {
+  const normalized = Number.isFinite(count) ? Math.max(0, Math.trunc(count)) : 0
+  if (unreadCount === normalized) {
+    return
+  }
+  unreadCount = normalized
   scheduleTrayImage()
 }
 

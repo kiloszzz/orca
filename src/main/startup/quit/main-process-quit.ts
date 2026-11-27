@@ -7,6 +7,7 @@ import { browserManager } from '../../browser/guest-lifecycle/manager/browser-ma
 import { settleTeardownWithinDeadline, type NamedQuitTeardown } from './quit-teardown-deadline'
 import { quitTeardownStartGate } from './quit-teardown-start-gate'
 import { abortPluginGitForShutdown } from '../../plugins/installation/plugin-git-repository'
+import { setUnreadDockBadgeCount } from '../../dock/unread-badge'
 import { destroySystemTray } from '../../tray/system-tray'
 import { shutdownTelemetry } from '../../telemetry/client'
 import { shutdownObservability } from '../../observability/index'
@@ -65,6 +66,8 @@ function stopNativeObserversAndTray(updateQuitInProgress: boolean): void {
       { message: 'will-quit cleanup for update install; daemonTeardown=disconnect' }
     )
   }
+  // Clear Dock and menu-bar unread count before tearing down the tray.
+  setUnreadDockBadgeCount(0)
   // Remove the Windows tray icon only after renderer vetoes are past.
   destroySystemTray()
 }

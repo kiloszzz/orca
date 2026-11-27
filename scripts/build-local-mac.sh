@@ -204,6 +204,9 @@ fi
 if [[ "$FAST" -eq 0 || ! -f "$ROOT_DIR/native/process-footprint-macos/.build/release/orca-process-footprint" ]]; then
   run pnpm run build:process-footprint-macos
 fi
+if [[ "$FAST" -eq 0 || ! -f "$ROOT_DIR/native/socket-owner-macos/.build/release/orca-socket-owner" ]]; then
+  run pnpm run build:socket-owner-macos
+fi
 if [[ "$FAST" -eq 0 || ! -f "$ROOT_DIR/native/notification-status-macos/.build/release/orca-notification-status" ]]; then
   run pnpm run build:notification-status-macos
 fi

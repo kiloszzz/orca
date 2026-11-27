@@ -81,7 +81,9 @@ async function resolveLatestReleaseVersion() {
 }
 
 function expectedInventoryHash() {
+  const providerExecSource = join(ROOT, 'native', 'provider-exec', 'provider-exec.c')
   const signature = [
+    ...(existsSync(providerExecSource) ? [`provider-exec.c:${sha256Of(providerExecSource)}`] : []),
     ...ORCAD_TEMPLATE_TARGETS.map(
       (slot) =>
         `${slot}:${slotFileMappings(slot)
@@ -187,6 +189,15 @@ function isCacheValid(cacheDir) {
 }
 
 function isWorkspaceStaged(cacheDir) {
+  const workspaceManifestPath = join(PREBUILDS_DIR, 'manifest.json')
+  const cacheManifestPath = join(cacheDir, 'prebuilds', 'manifest.json')
+  if (
+    !existsSync(workspaceManifestPath) ||
+    !existsSync(cacheManifestPath) ||
+    sha256Of(workspaceManifestPath) !== sha256Of(cacheManifestPath)
+  ) {
+    return false
+  }
   const manifest = readManifest(PREBUILDS_DIR)
   if (findSlotProblems(manifest, PREBUILDS_DIR, ORCAD_TEMPLATE_TARGETS).length > 0) {
     return false

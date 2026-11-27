@@ -81,7 +81,8 @@ export const MobileNativeChatMessage = memo(function MobileNativeChatMessageImpl
   receipt,
   awaiting,
   userMessageOpen,
-  onToggleUserMessage
+  onToggleUserMessage,
+  withoutMeta
 }: {
   message: Chat.NativeChatMessage
   // Stable placement key survives older messages joining a folded row.
@@ -118,6 +119,8 @@ export const MobileNativeChatMessage = memo(function MobileNativeChatMessageImpl
   awaiting?: boolean
   userMessageOpen?: boolean
   onToggleUserMessage?: (messageId: string) => void
+  /** A group room draws one time line per turn; otherwise the time line always shows, so the row never shifts when copy appears. */
+  withoutMeta?: true
 }): React.JSX.Element {
   useMobileColorScheme()
   const t = useMobileTranslation()
@@ -167,6 +170,7 @@ export const MobileNativeChatMessage = memo(function MobileNativeChatMessageImpl
         pending={askPending}
         fontScale={fontScale}
         listsQuestions={false}
+        disclosureKey={`ask:${rowKey ?? message.id}`}
       />
     ) : null
   // A ref keeps the memoized Markdown context stable as the message streams.
@@ -228,6 +232,7 @@ export const MobileNativeChatMessage = memo(function MobileNativeChatMessageImpl
         <MobileNativeChatResolutionReceipt
           body={receipt}
           awaiting={awaiting}
+          disclosureKey={`receipt:${rowId}`}
           fontScale={fontScale}
         />
       </View>
@@ -394,8 +399,7 @@ export const MobileNativeChatMessage = memo(function MobileNativeChatMessageImpl
         </Content>
         {isUser ? <Marks.MobileNativeChatUserMessageNotes message={message} /> : null}
         {unsentNotice ? <Text style={styles.unsentNotice}>{unsentNotice}</Text> : null}
-        {/* Always shown, so the row never shifts when copy appears. */}
-        {(message.role === 'user' || message.role === 'assistant') && !agentFrom ? (
+        {(message.role === 'user' || message.role === 'assistant') && !agentFrom && !withoutMeta ? (
           <MobileNativeChatMessageMeta
             message={message}
             rowKey={rowKey ?? message.id}
